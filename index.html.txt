@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ViveFutTIV Admin</title>
+<style>
+:root{color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:#07101b;color:#eaf2fb;font-family:Arial,sans-serif}
+main{max-width:1000px;margin:auto;padding:24px}
+h1{margin:0 0 6px}
+.card{background:#0d1a29;border:1px solid #1d334a;border-radius:16px;padding:18px;margin:14px 0}
+input,textarea,button{width:100%;padding:12px;border-radius:10px;border:1px solid #2a4560;background:#091522;color:#fff}
+textarea{resize:vertical;font-family:monospace;font-size:12px}
+button{cursor:pointer;background:#1677ff;border:0;font-weight:700;margin-top:8px}
+button:disabled{opacity:.55;cursor:not-allowed}
+.danger{background:#a93232}
+.secondary{background:#263b52}
+.muted{color:#9fb0c1;font-size:13px}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.row{display:flex;justify-content:space-between;gap:16px;align-items:center;border-top:1px solid #1d334a;padding:14px 0}
+.row:first-child{border-top:0}
+.actions{min-width:150px}
+.switch{width:auto;padding:10px 12px;margin:3px 0}
+.hidden{display:none}
+.ok{color:#55d98b}
+.off{color:#ff9b9b}
+.badge{display:inline-block;padding:4px 8px;border-radius:999px;background:#172b3e;font-size:12px}
+.notice{padding:10px 12px;border-radius:10px;background:#102235;border:1px solid #1d3a55;margin-top:10px}
+@media(max-width:700px){
+ main{padding:14px}.grid{grid-template-columns:1fr}.row{display:block}.actions{min-width:0;margin-top:10px}.switch{width:100%}
+}
+</style>
+</head>
+<body>
+<main>
+<h1>ViveFutTIV Admin</h1>
+<p class="muted">Panel remoto de administración · funciona desde PC, teléfono o tablet.</p>
+
+<div id="login" class="card">
+  <h2>Acceso privado</h2>
+  <p class="muted">Solo usuarios autorizados en Supabase.</p>
+  <input id="email" type="email" autocomplete="username" placeholder="Correo">
+  <input id="password" type="password" autocomplete="current-password" placeholder="Contraseña" style="margin-top:8px">
+  <button onclick="login()">Entrar</button>
+  <p id="loginMsg" class="muted"></p>
+</div>
+
+<div id="panel" class="hidden">
+  <div class="card">
+    <h2>Streaming global</h2>
+    <p id="globalState">Cargando...</p>
+    <button onclick="toggleGlobal()">Cambiar estado</button>
+  </div>
+
+  <div class="card">
+    <h2>Agregar transmisión autorizada</h2>
+    <div class="grid">
+      <input id="matchId" type="number" placeholder="ID del partido (football-data.org)">
+      <input id="matchName" placeholder="Nombre del partido">
+      <input id="url" placeholder="URL de la transmisión (http/https)">
+      <input id="referrer" placeholder="Referer (opcional)">
+      <input id="userAgent" placeholder="User-Agent (opcional)">
+      <input id="starts" type="datetime-local">
+      <input id="ends" type="datetime-local">
+    </div>
+    <button onclick="addStream()">Guardar transmisión</button>
+    <p id="msg" class="muted"></p>
+    <div class="notice muted">Usa únicamente transmisiones sobre las que tengas autorización.</div>
+  </div>
+
+  <!-- Módulo de Carga Automática M3U -->
+  <div class="card">
+    <h2>⚡ Cargar Canales M3U en Lote</h2>
+    <p class="muted">Pega tu lista #EXTM3U completa en el recuadro para agregar todos los canales de golpe.</p>
+    <textarea id="m3uInput" rows="6" placeholder="Pega aquí tu lista M3U completa..."></textarea>
+    <button id="btnM3u" onclick="addBulkM3U()" style="background:#0284c7">Cargar Lista Automáticamente</button>
+    <p id="m3uMsg" class="muted"></p>
+  </div>
+
+  <div class="card">
+    <h2>Transmisiones</h2>
+    <div id="streams">Cargando...</div>
+  </div>
+
+  <button class="danger" onclick="logout()">Cerrar sesión</button>
+</div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const SUPABASE_URL='https://zinqmmwprwvtjipfwfqp.supabase.co';
+const SUPABASE_PUBLISHABLE_KEY='sb_publishable_TSOF9M-eL9DvKj42QKerxA_uZeWGw9h';
+const sb=supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY);
+let globalEnabled=false, initializing=false;
+
+const $=id=>document.getElementById(id);
+
+async function login(){
+  const {error}=await sb.auth.signInWithPassword({
+    email:$('email').value.trim(),
+    password:$('password').value
+  });
+  if(error){$('loginMsg').textContent=error.message;return}
+  await init();
+}
+
+async function init(){
+  if(initializing)return;
+  initializing=true;
+  try{
+    const {data:{user}}=await sb.auth.getUser();
+    if(!user){
+      $('login').classList.remove('hidden');$('panel').classList.add('hidden');
+      return;
+    }
+    $('login').classList.add('hidden');$('panel').classList.remove('hidden');
+    await loadGlobal();
+    await loadStreams();
+  } finally { initializing=false; }
+}
+
+async function loadGlobal(){
+  const {data,error}=await sb.from('app_config')
+    .select('value').eq('key','streaming_enabled').maybeSingle();
+  if(error){$('globalState').textContent=error.message;return}
+  globalEnabled=!!data?.value;
+  $('globalState').innerHTML=globalEnabled
+    ? '<span class="ok">🟢 ACTIVADO</span>'
+    : '<span class="off">🔴 DESACTIVADO</span>';
+}
+
+async function toggleGlobal(){
+  const {error}=await sb.from('app_config')
+    .upsert({key:'streaming_enabled',value:!globalEnabled});
+  if(error)alert(error.message); else await loadGlobal();
+}
+
+async function addStream(){
+  const payload={
+    match_id:Number($('matchId').value),
+    match_name:$('matchName').value.trim(),
+    stream_url:$('url').value.trim(),
+    referrer:$('referrer').value.trim()||null,
+    user_agent:$('userAgent').value.trim()||null,
+    starts_at:$('starts').value?new Date($('starts').value).toISOString():null,
+    ends_at:$('ends').value?new Date($('ends').value).toISOString():null,
+    enabled:false
+  };
+  if(!payload.match_id||!payload.match_name||!/^https?:\/\//i.test(payload.stream_url)){
+    $('msg').textContent='Completa ID, nombre y una URL válida (http/https).';
+    return;
+  }
+  const {error}=await sb.from('streams').insert(payload);
+  $('msg').textContent=error
+    ? error.message
+    : 'Guardada como DESACTIVADA. Actívala después de verificar la autorización.';
+  if(!error){
+    ['matchId','matchName','url','referrer','userAgent','starts','ends'].forEach(id=>$(id).value='');
+    await loadStreams();
+  }
+}
+
+// Función para procesar y cargar la lista M3U en bloque
+async function addBulkM3U(){
+  const text = $('m3uInput').value.trim();
+  const btn = $('btnM3u');
+  const msg = $('m3uMsg');
+
+  if(!text){
+    msg.textContent = 'Por favor pega la lista M3U primero.';
+    return;
+  }
+
+  btn.disabled = true;
+  msg.textContent = 'Procesando lista M3U...';
+
+  const lines = text.split('\n');
+  const payloadList = [];
+  let currentName = '';
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (line.startsWith('#EXTINF:')) {
+      const parts = line.split(',');
+      if (parts.length > 1) {
+        currentName = parts.slice(1).join(',').trim();
+      }
+    } else if (line.startsWith('http://') || line.startsWith('https://')) {
+      if (currentName) {
+        payloadList.push({
+          match_id: Math.floor(100000 + Math.random() * 900000), // Genera un ID automático
+          match_name: currentName,
+          stream_url: line,
+          enabled: true // Se agregan activadas por defecto
+        });
+        currentName = '';
+      }
+    }
+  }
+
+  if (payloadList.length === 0) {
+    msg.textContent = 'No se encontraron canales válidos en el texto ingresado.';
+    btn.disabled = false;
+    return;
+  }
+
+  msg.textContent = `Insertando ${payloadList.length} canales en la base de datos...`;
+
+  const { error } = await sb.from('streams').insert(payloadList);
+
+  if (error) {
+    msg.textContent = 'Error al guardar: ' + error.message;
+  } else {
+    msg.textContent = `¡Éxito! Se guardaron ${payloadList.length} canales correctamente.`;
+    $('m3uInput').value = '';
+    await loadStreams();
+  }
+
+  btn.disabled = false;
+}
+
+async function loadStreams(){
+  const {data,error}=await sb.from('streams').select('*').order('created_at',{ascending:false});
+  if(error){$('streams').textContent=error.message;return}$('streams').innerHTML=data.map(s=>`
+    <div class="row">
+      <div>
+        <b>${esc(s.match_name)}</b>
+        <div class="muted">
+          ID ${s.match_id}<br>
+          ${esc(s.stream_url)}<br>
+          ${s.enabled?'<span class="ok">🟢 ACTIVA</span>':'<span class="off">🔴 DESACTIVADA</span>'}
+        </div>
+      </div>
+      <div class="actions">
+        <button class="secondary switch" onclick="setStream('${s.id}',${!s.enabled})">
+          ${s.enabled?'Desactivar':'Activar'}
+        </button>
+        <button class="danger switch" onclick="removeStream('${s.id}')">Eliminar</button>
+      </div>
+    </div>`).join('') || '<p class="muted">No hay transmisiones.</p>';
+}
+
+async function setStream(id,enabled){
+  const {error}=await sb.from('streams').update({enabled}).eq('id',id);
+  if(error)alert(error.message); else await loadStreams();
+}
+
+async function removeStream(id){
+  if(!confirm('¿Eliminar esta transmisión?'))return;
+  const {error}=await sb.from('streams').delete().eq('id',id);
+  if(error)alert(error.message); else await loadStreams();
+}
+
+async function logout(){
+  await sb.auth.signOut();
+  await init();
+}
+
+function esc(x){
+  return String(x??'').replace(/[&<>"']/g,m=>({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[m]));
+}
+
+sb.auth.onAuthStateChange(()=>init());
+init();
+</script>
+</body>
+</html>
