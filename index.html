@@ -158,9 +158,10 @@ const payload={
     ends_at:$('ends').value?new Date($('ends').value).toISOString():null,
     enabled:false
 };
-  if(!payload.match_id||!payload.match_name||!/^https?:\/\//i.test(payload.stream_url)){
-    $('msg').textContent='Completa ID, nombre y una URL válida (http/https).';
+ if(!payload.match_name || !/^https?:\/\//i.test(payload.stream_url)){
+    $('msg').textContent='Completa el nombre del partido y una URL válida (http/https).';
     return;
+}
   }
   const {error}=await sb.from('streams').insert(payload);
   $('msg').textContent=error
