@@ -202,7 +202,7 @@ async function addBulkM3U(){
     } else if (line.startsWith('http://') || line.startsWith('https://')) {
       if (currentName) {
         payloadList.push({
-          match_id: Math.floor(100000 + Math.random() * 900000), // Genera un ID automático
+          match_id: null,
           match_name: currentName,
           stream_url: line,
           enabled: true // Se agregan activadas por defecto
