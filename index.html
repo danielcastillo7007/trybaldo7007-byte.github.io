@@ -168,7 +168,8 @@ const payload={
     ? error.message
     : 'Guardada como DESACTIVADA. Actívala después de verificar la autorización.';
   if(!error){
-    ['matchId','matchName','url','referrer','userAgent','starts','ends'].forEach(id=>$(id).value='');
+    ['matchId','matchName','homeTeam','awayTeam','competition','url','referrer','userAgent','starts','ends']
+  .forEach(id=>$(id).value='');
     await loadStreams();
   }
 }
