@@ -143,16 +143,21 @@ async function toggleGlobal(){
 }
 
 async function addStream(){
-  const payload={
-    match_id:Number($('matchId').value),
+  const matchIdValue = $('matchId').value.trim();
+
+const payload={
+    match_id: matchIdValue ? Number(matchIdValue) : null,
     match_name:$('matchName').value.trim(),
+    home_team:$('homeTeam').value.trim() || null,
+    away_team:$('awayTeam').value.trim() || null,
+    competition:$('competition').value.trim() || null,
     stream_url:$('url').value.trim(),
     referrer:$('referrer').value.trim()||null,
     user_agent:$('userAgent').value.trim()||null,
     starts_at:$('starts').value?new Date($('starts').value).toISOString():null,
     ends_at:$('ends').value?new Date($('ends').value).toISOString():null,
     enabled:false
-  };
+};
   if(!payload.match_id||!payload.match_name||!/^https?:\/\//i.test(payload.stream_url)){
     $('msg').textContent='Completa ID, nombre y una URL válida (http/https).';
     return;
