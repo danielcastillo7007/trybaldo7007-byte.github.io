@@ -162,7 +162,7 @@ const payload={
     $('msg').textContent='Completa el nombre del partido y una URL válida (http/https).';
     return;
 }
-  }
+  
   const {error}=await sb.from('streams').insert(payload);
   $('msg').textContent=error
     ? error.message
