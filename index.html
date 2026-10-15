@@ -274,9 +274,25 @@ async function importarProgramacion(){
   if(!/^\d{4}-\d{2}-\d{2}$/.test(body.fecha||'') || body.zona_horaria!=='America/Panama'){
     estado.textContent='Selecciona una fecha válida y utiliza America/Panama.';return;
   }
-  if(!body.partidos.every(p=>p && p.local && p.visitante && p.canal && p.hora && p.fuente && p.pais)){
-    estado.textContent='Cada partido necesita local, visitante, canal, hora, fuente y pais.';return;
+  const errores=[];
+  body.partidos.forEach((p,i)=>{
+    const n=i+1;
+    if(!p || typeof p!=='object' || Array.isArray(p)){errores.push(`Partido ${n}: debe ser un objeto.`);return;}
+    for(const campo of ['local','visitante','canal','hora','fuente','pais']){
+      if(typeof p[campo]!=='string' || !p[campo].trim())errores.push(`Partido ${n}: falta ${campo}.`);
+    }
+    if(typeof p.hora==='string' && !/^([01]\d|2[0-3]):[0-5]\d$/.test(p.hora))errores.push(`Partido ${n}: hora inválida (HH:MM).`);
+    if(typeof p.fuente==='string' && !/^https:\/\/[^\s]+$/i.test(p.fuente))errores.push(`Partido ${n}: fuente debe comenzar con https://.`);
+    if(p.pais!=='PA')errores.push(`Partido ${n}: pais debe ser PA.`);
+  });
+  if(errores.length){
+    estado.textContent=`Se encontraron ${errores.length} errores. Corrige antes de importar.`;
+    dest.replaceChildren();
+    const pre=document.createElement('pre');pre.className='notice';pre.style.whiteSpace='pre-wrap';
+    pre.textContent=errores.join('\n');dest.append(pre);return;
   }
+  $('iaFecha').value=body.fecha;
+
   btn.disabled=true;estado.textContent='Consultando schedule-import...';dest.replaceChildren();
   try{
     const {data,error}=await sb.functions.invoke('schedule-import',{body});
@@ -285,7 +301,7 @@ async function importarProgramacion(){
       estado.textContent='Error al importar: '+error.message+(detail?' · '+detail.slice(0,400):'');return;
     }
     const resultados=Array.isArray(data?.results)?data.results:[];
-    estado.textContent=`Se analizaron ${resultados.length} registros. Ninguna transmisión fue publicada automáticamente.`;
+    estado.textContent=`Se enviaron ${body.partidos.length} partidos; el servidor devolvió ${resultados.length} resultados. Ninguna transmisión fue publicada automáticamente.`;
     for(const r of resultados){
       const div=document.createElement('div');div.className='notice';
       const titulo=document.createElement('strong');titulo.textContent=String(r.match||'Partido')+' · '+String(r.channel||'Canal');
