@@ -84,6 +84,22 @@ button:disabled{opacity:.55;cursor:not-allowed}
     <p id="m3uMsg" class="muted"></p>
   </div>
 
+
+  <div class="card" id="programacionIA">
+    <h2>🤖 Programación IA · ViveFutTIV 0.8</h2>
+    <p class="muted">Pega una programación en JSON para analizar coincidencias con los canales de Admin. La importación NO publica transmisiones automáticamente: requiere comprobar programación y derechos del evento.</p>
+    <div class="grid">
+      <input id="iaFecha" type="date" aria-label="Fecha de programación">
+      <input id="iaZona" value="America/Panama" readonly aria-label="Zona horaria">
+    </div>
+    <p class="muted">Formato: partidos con local, visitante, hora (HH:MM), canal (nombre exacto en Admin), fuente (URL HTTPS) y pais (PA).</p>
+    <textarea id="iaTexto" rows="10" spellcheck="false" placeholder='{"partidos":[{"local":"Equipo A","visitante":"Equipo B","hora":"19:00","canal":"Canal deportivo","fuente":"https://ejemplo.com/programacion","pais":"PA"}]}'></textarea>
+    <button class="secondary" onclick="ejemploProgramacion()">Ver ejemplo de formato</button>
+    <button id="iaEnviar" onclick="importarProgramacion()">Analizar programación en Admin</button>
+    <p id="iaEstado" class="muted" role="status"></p>
+    <div id="iaResultados" aria-live="polite"></div>
+  </div>
+
   <div class="card">
     <h2>Transmisiones</h2>
     <div id="streams">Cargando...</div>
@@ -205,7 +221,7 @@ async function addBulkM3U(){
           match_id: null,
           match_name: currentName,
           stream_url: line,
-          enabled: true // Se agregan activadas por defecto
+          enabled: false // Requieren verificación de derechos antes de activarse
         });
         currentName = '';
       }
@@ -225,12 +241,60 @@ async function addBulkM3U(){
   if (error) {
     msg.textContent = 'Error al guardar: ' + error.message;
   } else {
-    msg.textContent = `¡Éxito! Se guardaron ${payloadList.length} canales correctamente.`;
+    msg.textContent = `Se guardaron ${payloadList.length} canales DESACTIVADOS, pendientes de verificar derechos.`;
     $('m3uInput').value = '';
     await loadStreams();
   }
 
   btn.disabled = false;
+}
+
+
+// La IA o una lista externa aporta datos; la función verifica y registra, sin publicar.
+function ejemploProgramacion(){
+  const fecha=$('iaFecha').value || new Date().toLocaleDateString('en-CA',{timeZone:'America/Panama'});
+  $('iaFecha').value=fecha;
+  $('iaTexto').value=JSON.stringify({fecha,zona_horaria:'America/Panama',partidos:[{
+    local:'Equipo A',visitante:'Equipo B',hora:'19:00',canal:'Nombre exacto del canal en Admin',
+    fuente:'https://ejemplo.com/programacion',pais:'PA'
+  }]},null,2);
+  $('iaEstado').textContent='Ejemplo ilustrativo: reemplaza equipos, canal, fecha y fuente con información real y verificable.';
+}
+async function importarProgramacion(){
+  const btn=$('iaEnviar'),estado=$('iaEstado'),dest=$('iaResultados');
+  let body;
+  try{body=JSON.parse($('iaTexto').value.trim());}
+  catch{estado.textContent='El texto debe ser JSON válido. Usa «Ver ejemplo de formato» como guía.';return;}
+  if(Array.isArray(body))body={partidos:body};
+  if(!body || !Array.isArray(body.partidos) || body.partidos.length<1 || body.partidos.length>100){
+    estado.textContent='Debes incluir entre 1 y 100 partidos en la propiedad «partidos».';return;
+  }
+  body.fecha=body.fecha||$('iaFecha').value;
+  body.zona_horaria=body.zona_horaria||'America/Panama';
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(body.fecha||'') || body.zona_horaria!=='America/Panama'){
+    estado.textContent='Selecciona una fecha válida y utiliza America/Panama.';return;
+  }
+  if(!body.partidos.every(p=>p && p.local && p.visitante && p.canal && p.hora && p.fuente && p.pais)){
+    estado.textContent='Cada partido necesita local, visitante, canal, hora, fuente y pais.';return;
+  }
+  btn.disabled=true;estado.textContent='Consultando schedule-import...';dest.replaceChildren();
+  try{
+    const {data,error}=await sb.functions.invoke('schedule-import',{body});
+    if(error){
+      let detail='';try{detail=await error.context?.text?.()||'';}catch{}
+      estado.textContent='Error al importar: '+error.message+(detail?' · '+detail.slice(0,400):'');return;
+    }
+    const resultados=Array.isArray(data?.results)?data.results:[];
+    estado.textContent=`Se analizaron ${resultados.length} registros. Ninguna transmisión fue publicada automáticamente.`;
+    for(const r of resultados){
+      const div=document.createElement('div');div.className='notice';
+      const titulo=document.createElement('strong');titulo.textContent=String(r.match||'Partido')+' · '+String(r.channel||'Canal');
+      const info=document.createElement('p');info.className='muted';info.textContent=String(r.status||'pending')+' — '+String(r.reason||'Pendiente de verificación');
+      div.append(titulo,info);dest.append(div);
+    }
+    if(data?.notice){const n=document.createElement('p');n.className='muted';n.textContent=data.notice;dest.append(n);}
+  }catch(e){estado.textContent='Error de conexión: '+String(e?.message||e);}
+  finally{btn.disabled=false;}
 }
 
 async function loadStreams(){
