@@ -86,12 +86,15 @@ button:disabled{opacity:.55;cursor:not-allowed}
 
 
   <div class="card" id="programacionIA">
-    <h2>🤖 Programación IA · ViveFutTIV 0.8</h2>
+    <h2>🤖 Programación IA · ViveFutTIV 0.9</h2>
     <p class="muted">Pega una programación en JSON para analizar coincidencias con los canales de Admin. La importación NO publica transmisiones automáticamente: requiere comprobar programación y derechos del evento.</p>
     <div class="grid">
       <input id="iaFecha" type="date" aria-label="Fecha de programación">
       <input id="iaZona" value="America/Panama" readonly aria-label="Zona horaria">
     </div>
+    <button id="iaAuto" onclick="consultarProgramacionAutomatica()" style="background:#087e70">Consultar programación automáticamente</button>
+    <p id="iaAutoEstado" class="muted" role="status"></p>
+    <div id="iaAutoResultados" aria-live="polite"></div>
     <p class="muted">Formato: partidos con local, visitante, hora (HH:MM), canal (nombre exacto en Admin), fuente (URL HTTPS) y pais (PA).</p>
     <textarea id="iaTexto" rows="10" spellcheck="false" placeholder='{"partidos":[{"local":"Equipo A","visitante":"Equipo B","hora":"19:00","canal":"Canal deportivo","fuente":"https://ejemplo.com/programacion","pais":"PA"}]}'></textarea>
     <button class="secondary" onclick="ejemploProgramacion()">Ver ejemplo de formato</button>
@@ -249,6 +252,79 @@ async function addBulkM3U(){
   btn.disabled = false;
 }
 
+
+// Consulta autenticada a sports-schedule, sin exponer claves privadas.
+async function consultarProgramacionAutomatica(){
+  const btn=$('iaAuto'),estado=$('iaAutoEstado'),dest=$('iaAutoResultados');
+  const fecha=$('iaFecha').value || new Date().toLocaleDateString('en-CA',{timeZone:'America/Panama'});
+  $('iaFecha').value=fecha;
+  btn.disabled=true;
+  estado.textContent='Consultando partidos y canales de televisión...';
+  dest.replaceChildren();
+  try{
+    const {data:{session},error:authError}=await sb.auth.getSession();
+    if(authError || !session?.access_token)throw new Error('Inicia sesión nuevamente para consultar la programación.');
+    const url=SUPABASE_URL+'/functions/v1/sports-schedule?fecha='+encodeURIComponent(fecha);
+    const respuesta=await fetch(url,{
+      method:'GET',
+      headers:{'Authorization':'Bearer '+session.access_token,'apikey':SUPABASE_PUBLISHABLE_KEY}
+    });
+    const data=await respuesta.json().catch(()=>null);
+    if(!respuesta.ok || data?.ok!==true){
+      throw new Error('sports-schedule: '+String(data?.error||('HTTP '+respuesta.status)));
+    }
+    const partidos=Array.isArray(data.partidos)?data.partidos:[];
+    const entradas=[];
+    let partidosConCanales=0;
+    for(const p of partidos){
+      const div=document.createElement('div');div.className='notice';
+      const titulo=document.createElement('strong');
+      titulo.textContent=String(p.local||'Local')+' vs '+String(p.visitante||'Visitante')+
+        ' · '+String(p.hora_panama||'Hora no disponible')+' (Panamá)';
+      div.append(titulo);
+      const sub=document.createElement('p');sub.className='muted';
+      sub.textContent=String(p.liga||'Liga no indicada');div.append(sub);
+      const canales=Array.isArray(p.canales)?p.canales:[];
+      if(canales.length)partidosConCanales++;
+      const detalle=document.createElement('p');detalle.className='muted';
+      detalle.textContent=canales.length?canales.map(c=>String(c.nombre||'Canal')+' ('+String(c.pais||'país no indicado')+')').join(' · '):
+        'No hay canal anunciado en esta fuente.';
+      div.append(detalle);
+      const nota=document.createElement('p');nota.className='muted';
+      nota.textContent='Programación y derechos pendientes de verificar; ninguna señal publicada.';
+      div.append(nota);dest.append(div);
+      // Solo los canales marcados explícitamente para Panamá se envían al importador.
+      // No se supone que un canal internacional tenga derechos en Panamá.
+      for(const c of canales){
+        const pais=String(c.pais||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toLowerCase();
+        if(pais!=='panama' && pais!=='pa')continue;
+        if(!p.local || !p.visitante || !/^([01]\d|2[0-3]):[0-5]\d$/.test(String(p.hora_panama||'')))continue;
+        if(!c.nombre || !/^https:\/\//i.test(String(c.fuente||'')))continue;
+        entradas.push({local:String(p.local),visitante:String(p.visitante),hora:String(p.hora_panama),
+          canal:String(c.nombre),fuente:String(c.fuente),pais:'PA'});
+      }
+    }
+    estado.textContent=`${partidos.length} partidos encontrados · ${partidosConCanales} con canales anunciados · ${entradas.length} coincidencias de programación marcadas para Panamá.`;
+    if(!partidos.length){
+      const n=document.createElement('p');n.className='muted';
+      n.textContent='La fuente no devolvió partidos para esta fecha.';dest.append(n);
+    }
+    if(entradas.length){
+      const seleccion=entradas.slice(0,100);
+      $('iaTexto').value=JSON.stringify({fecha,zona_horaria:'America/Panama',partidos:seleccion},null,2);
+      const n=document.createElement('p');n.className='muted';
+      n.textContent='Se prepararon '+seleccion.length+' registros para schedule-import.'+
+        (entradas.length>100?' Solo se analizarán los primeros 100.':'');
+      dest.append(n);
+      await importarProgramacion();
+    }else{
+      const n=document.createElement('p');n.className='muted';
+      n.textContent='No hay canales identificados específicamente para Panamá con datos completos. Se muestran los partidos para revisión; no se enviaron coincidencias al importador.';
+      dest.append(n);
+    }
+  }catch(e){estado.textContent='No se pudo consultar la programación: '+String(e?.message||e);}
+  finally{btn.disabled=false;}
+}
 
 // La IA o una lista externa aporta datos; la función verifica y registra, sin publicar.
 function ejemploProgramacion(){
