@@ -105,6 +105,20 @@ button:disabled{opacity:.55;cursor:not-allowed}
 
   <div class="card">
     <h2>Transmisiones</h2>
+    <div class="notice" style="border-color:#793737">
+      <strong>Zona de eliminación masiva</strong>
+      <p class="muted">Borra todas las transmisiones guardadas. Se requiere la contraseña con la que inicias sesión en este Admin. Esta operación no se puede deshacer.</p>
+      <button id="btnDeleteAll" class="danger" onclick="mostrarBorradoTotal()">Eliminar todas las transmisiones</button>
+      <div id="deleteAllBox" class="hidden" style="margin-top:12px">
+        <label for="deleteAllPassword">Contraseña de inicio de sesión</label>
+        <input id="deleteAllPassword" type="password" autocomplete="off" placeholder="Escribe tu contraseña" style="margin-top:8px">
+        <label for="deleteAllPhrase" style="display:block;margin-top:12px">Escribe ELIMINAR TODO para confirmar</label>
+        <input id="deleteAllPhrase" autocomplete="off" placeholder="ELIMINAR TODO" style="margin-top:8px">
+        <button id="btnConfirmDeleteAll" class="danger" onclick="eliminarTodasLasTransmisiones()">Confirmar borrado definitivo</button>
+        <button class="secondary" onclick="cancelarBorradoTotal()">Cancelar</button>
+        <p id="deleteAllMsg" class="muted" role="status" aria-live="polite"></p>
+      </div>
+    </div>
     <div id="streams">Cargando...</div>
   </div>
 
@@ -430,6 +444,71 @@ async function importarProgramacion(){
     if(aviso){const n=document.createElement('p');n.className='muted';n.textContent=String(aviso);dest.append(n);}
   }catch(e){estado.textContent='Error de conexión: '+String(e?.message||e);}
   finally{btn.disabled=false;}
+}
+
+function mostrarBorradoTotal(){
+  $('deleteAllBox').classList.remove('hidden');
+  $('deleteAllMsg').textContent='';
+  $('deleteAllPassword').focus();
+}
+
+function cancelarBorradoTotal(){
+  $('deleteAllPassword').value='';
+  $('deleteAllPhrase').value='';
+  $('deleteAllMsg').textContent='';
+  $('deleteAllBox').classList.add('hidden');
+}
+
+async function eliminarTodasLasTransmisiones(){
+  const btn=$('btnConfirmDeleteAll');
+  const msg=$('deleteAllMsg');
+  const password=$('deleteAllPassword').value;
+  if(!password || $('deleteAllPhrase').value.trim()!=='ELIMINAR TODO'){
+    msg.textContent='Introduce tu contraseña y escribe exactamente ELIMINAR TODO.';
+    return;
+  }
+  btn.disabled=true;
+  try{
+    const {data:{user},error:userError}=await sb.auth.getUser();
+    if(userError || !user?.email)throw new Error('Debes iniciar sesión con una cuenta de correo válida.');
+    msg.textContent='Verificando contraseña...';
+    // La contraseña se verifica en Supabase Auth, nunca se guarda en el HTML.
+    const {data:authData,error:authError}=await sb.auth.signInWithPassword({email:user.email,password});
+    $('deleteAllPassword').value='';
+    if(authError || authData?.user?.id!==user.id){
+      throw new Error('Contraseña incorrecta o sesión no válida. No se borró nada.');
+    }
+    const {count,error:countError}=await sb.from('streams').select('id',{count:'exact',head:true});
+    if(countError)throw new Error('No se pudo consultar el total: '+countError.message);
+    if(!count){msg.textContent='No hay transmisiones para eliminar.';cancelarBorradoTotal();await loadStreams();return;}
+    if(!confirm('ÚLTIMA CONFIRMACIÓN: ¿Eliminar definitivamente '+count+' transmisiones?')){
+      msg.textContent='Borrado cancelado. No se eliminó ninguna transmisión.';return;
+    }
+    let eliminadas=0;
+    // Lotes pequeños para respetar límites de respuesta de PostgREST.
+    for(let i=0;i<1000;i++){
+      const {data:filas,error:readError}=await sb.from('streams').select('id').limit(100);
+      if(readError)throw new Error('Error consultando transmisiones: '+readError.message);
+      if(!filas?.length)break;
+      const ids=filas.map(x=>x.id);
+      const {data:borradas,error:deleteError}=await sb.from('streams').delete().in('id',ids).select('id');
+      if(deleteError)throw new Error('Error eliminando transmisiones: '+deleteError.message);
+      if(!borradas?.length)throw new Error('La base de datos no permitió borrar registros. Revisa los permisos de streams.');
+      eliminadas+=borradas.length;
+      msg.textContent='Eliminadas '+eliminadas+' transmisiones...';
+    }
+    const {count:restantes,error:verifyError}=await sb.from('streams').select('id',{count:'exact',head:true});
+    if(verifyError)throw new Error('No se pudo verificar el resultado: '+verifyError.message);
+    if(restantes!==0)throw new Error('Borrado parcial: quedan '+restantes+' transmisiones.');
+    cancelarBorradoTotal();
+    $('deleteAllBox').classList.remove('hidden');
+    msg.textContent='Se eliminaron '+eliminadas+' transmisiones. La lista está vacía.';
+    await loadStreams();
+  }catch(e){
+    $('deleteAllPassword').value='';
+    msg.textContent=String(e?.message||e);
+    await loadStreams();
+  }finally{btn.disabled=false;}
 }
 
 async function loadStreams(){
