@@ -105,6 +105,15 @@ button:disabled{opacity:.55;cursor:not-allowed}
 
   <div class="card">
     <h2>Transmisiones</h2>
+    <div class="notice" style="border-color:#236f55">
+      <strong>Control masivo de transmisiones</strong>
+      <p class="muted">Activa o desactiva todos los canales guardados en Admin. Este control es independiente del interruptor Streaming global. Activa únicamente señales para las que tengas autorización.</p>
+      <div class="grid">
+        <button id="btnEnableAll" onclick="setTodasLasTransmisiones(true)" style="background:#147d50">Activar todas las transmisiones</button>
+        <button id="btnDisableAll" onclick="setTodasLasTransmisiones(false)" class="secondary">Desactivar todas las transmisiones</button>
+      </div>
+      <p id="bulkStateMsg" class="muted" role="status" aria-live="polite"></p>
+    </div>
     <div class="notice" style="border-color:#793737">
       <strong>Zona de eliminación masiva</strong>
       <p class="muted">Borra todas las transmisiones guardadas. Se requiere la contraseña con la que inicias sesión en este Admin. Esta operación no se puede deshacer.</p>
@@ -509,6 +518,45 @@ async function eliminarTodasLasTransmisiones(){
     msg.textContent=String(e?.message||e);
     await loadStreams();
   }finally{btn.disabled=false;}
+}
+
+// Actualización por lotes: evita que el límite de 1.000 filas de Supabase deje canales sin modificar.
+async function setTodasLasTransmisiones(enabled){
+  const msg=$('bulkStateMsg');
+  const btnOn=$('btnEnableAll'),btnOff=$('btnDisableAll');
+  const accion=enabled?'ACTIVAR':'DESACTIVAR';
+  if(!confirm(`¿${accion} todas las transmisiones de la lista? Esta acción cambiará el estado individual de todos los canales.`))return;
+  btnOn.disabled=btnOff.disabled=true;
+  let modificadas=0;
+  try{
+    // Se consulta el total de filas que necesitan el cambio; no se modifica la configuración global.
+    const {count,error:countError}=await sb.from('streams').select('id',{count:'exact',head:true}).eq('enabled',!enabled);
+    if(countError)throw new Error('No se pudo consultar el total: '+countError.message);
+    if(count===0){msg.textContent='Todos los canales visibles ya estaban '+(enabled?'activados.':'desactivados.');return;}
+    if(count===null)throw new Error('Supabase no devolvió el total de canales.');
+    msg.textContent=`Actualizando ${count} transmisiones...`;
+    // Buscar siempre los pendientes; después de cada actualización desaparecen del filtro.
+    for(let lote=0;lote<10000;lote++){
+      const {data:filas,error:readError}=await sb.from('streams').select('id').eq('enabled',!enabled).order('id',{ascending:true}).limit(100);
+      if(readError)throw new Error('Error consultando canales: '+readError.message);
+      if(!filas?.length)break;
+      const ids=filas.map(x=>x.id);
+      const {data:actualizadas,error:updateError}=await sb.from('streams').update({enabled}).in('id',ids).select('id');
+      if(updateError)throw new Error('Error actualizando canales: '+updateError.message);
+      if(!actualizadas?.length)throw new Error('Supabase no permitió actualizar estos canales. Revisa los permisos RLS de streams.');
+      modificadas+=actualizadas.length;
+      msg.textContent=`${modificadas} de ${count} transmisiones procesadas...`;
+    }
+    const {count:pendientes,error:verifyError}=await sb.from('streams').select('id',{count:'exact',head:true}).eq('enabled',!enabled);
+    if(verifyError)throw new Error('No se pudo verificar el resultado: '+verifyError.message);
+    if(pendientes!==0)throw new Error(`Actualización parcial: quedan ${pendientes} canales sin cambiar.`);
+    msg.textContent=`Listo: ${modificadas} transmisiones ${enabled?'activadas':'desactivadas'}. El interruptor global no se modificó.`;
+  }catch(e){
+    msg.textContent=`No se completó la operación. ${modificadas} canales procesados. ${String(e?.message||e)}`;
+  }finally{
+    btnOn.disabled=btnOff.disabled=false;
+    await loadStreams();
+  }
 }
 
 async function loadStreams(){
