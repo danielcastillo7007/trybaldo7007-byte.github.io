@@ -103,13 +103,13 @@ button:disabled{opacity:.55;cursor:not-allowed}
     </div>
     <div class="notice" id="lectorTexto" style="border-color:#236f55">
       <h3>📋 Analizar programación copiada</h3>
-      <p class="muted">Pega texto de una guía que tengas permiso de utilizar. Reconoce líneas como «Equipo A vs Equipo B | 19:00 | ESPN | PA», o bloques con partido, hora y «Canales: ...». No consulta la web ni inventa canales.</p>
+      <p class="muted">Pega texto de una guía que tengas permiso de utilizar. Reconoce tablas Markdown con enlaces de partidos/canales, el formato «▴ Liga» seguido de hora, partido y canales, y también acepta «Equipo A vs Equipo B | 19:00 | ESPN | PA». No consulta la web ni inventa canales.</p>
       <textarea id="iaPegarTexto" rows="8" placeholder="Equipo A vs Equipo B | 19:00 | ESPN | PA&#10;Equipo C vs Equipo D | 20:30 | DSports | AR"></textarea>
       <div class="grid" style="margin-top:8px">
         <input id="iaPegarFuente" type="url" placeholder="https://fuente-original.com/programacion" aria-label="URL de la fuente del texto">
         <select id="iaPegarPais" aria-label="País predeterminado de emisión"><option value="">País por registro (sin predeterminado)</option><option value="PA">Panamá (PA)</option><option value="AR">Argentina (AR)</option><option value="MX">México (MX)</option><option value="CO">Colombia (CO)</option><option value="ES">España (ES)</option><option value="GB">Reino Unido (GB)</option><option value="BR">Brasil (BR)</option><option value="CL">Chile (CL)</option><option value="PE">Perú (PE)</option><option value="UY">Uruguay (UY)</option></select>
       </div>
-      <p class="muted">Indica las horas en horario de Panamá (HH:MM). Para horas de otro país, conviértelas antes de analizar. Puedes corregir los resultados en el JSON antes de importar.</p>
+      <p class="muted">Indica las horas en horario de Panamá (HH:MM). El país de la liga no determina el país de transmisión: selecciona un país predeterminado solo si corresponde y revisa los países de cada canal en el JSON. La función importa un máximo de 100 registros por solicitud.</p>
       <button id="iaProcesarTexto" onclick="analizarTextoCopiado()" style="background:#147d50">Extraer partidos y canales del texto</button>
       <p id="iaPegarEstado" class="muted" role="status"></p>
       <div id="iaPegarResultados" aria-live="polite"></div>
@@ -424,7 +424,7 @@ async function leerProgramacionURL(){
   finally{boton.disabled=false;}
 }
 
-// Análisis local y revisable de texto pegado: sin scraping ni llamadas a IA.
+// Lector local: liga -> hora -> encuentro -> canales, además de formato delimitado.
 function analizarTextoCopiado(){
   const estado=$('iaPegarEstado'),dest=$('iaPegarResultados');dest.replaceChildren();
   const texto=$('iaPegarTexto').value.trim();
@@ -432,67 +432,105 @@ function analizarTextoCopiado(){
   const paisDefault=$('iaPegarPais').value;
   const fecha=$('iaFecha').value||new Date().toLocaleDateString('en-CA',{timeZone:'America/Panama'});
   $('iaFecha').value=fecha;
-  if(!texto){estado.textContent='Primero pega la programación que deseas analizar.';return;}
-  let fuenteValida=false;
-  try{const u=new URL(fuente);fuenteValida=u.protocol==='https:';}catch{}
-  if(!fuenteValida){estado.textContent='Indica la URL HTTPS de la fuente original para conservar la referencia.';return;}
-  const partidos=[];const descartes=[];
+  if(!texto){estado.textContent='Pega la programación primero.';return;}
+  try{const u=new URL(fuente);if(u.protocol!=='https:')throw Error();}
+  catch{estado.textContent='Introduce la URL HTTPS de referencia de la programación.';return;}
+  // Compatible con tablas Markdown de tres columnas con enlaces [texto](url "título").
   const lineas=texto.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
-  // Reconoce separadores |, tabulador o punto y coma, y bloques de varias líneas.
   const regexPartido=/^(.+?)\s+(?:vs\.?|v\.?|versus|contra|–|—|-)\s+(.+?)$/i;
-  const horaRe=/\b([01]\d|2[0-3]):([0-5]\d)\b/;
-  const limpiarHora=x=>{const m=String(x||'').match(horaRe);return m?m[0]:'';};
-  const normalPais=x=>normalizarPaisEmision(String(x||'').replace(/^pa[ií]s\s*:\s*/i,'').trim());
-  const crear=(equipos,hora,canal,pais,linea)=>{
-    const match=String(equipos||'').trim().match(regexPartido);
-    if(!match||!hora){descartes.push('No se reconoció partido/hora: '+String(linea).slice(0,110));return;}
-    const p={local:match[1].trim(),visitante:match[2].trim(),hora,canal:String(canal||'').trim(),fuente,pais:normalPais(pais||paisDefault)};
-    if(!p.canal || !regionPais(p.pais)){
-      descartes.push('Falta canal o país válido: '+String(linea).slice(0,110));return;
-    }
-    partidos.push(p);
-  };
-  let bloque=null;
-  const vaciarBloque=()=>{
-    if(!bloque)return;
-    const canales=bloque.canales.length?bloque.canales:[''];
-    for(const canal of canales)crear(bloque.equipos,bloque.hora,canal,bloque.pais,bloque.equipos);
-    bloque=null;
-  };
-  for(const linea of lineas){
-    const partes=linea.split(/\s*[|;\t]\s*/).map(x=>x.trim()).filter(Boolean);
-    if(partes.length>=3 && regexPartido.test(partes[0]) && limpiarHora(partes[1])){
-      vaciarBloque();
-      const canal=partes[2];const pais=partes[3]||paisDefault;
-      crear(partes[0],limpiarHora(partes[1]),canal,pais,linea);continue;
-    }
-    const partidoEnLinea=linea.match(/^(.*?)\s*[·|]\s*(\d{2}:\d{2})(?:\s*\([^)]*\))?$/);
-    const equipos=partidoEnLinea?partidoEnLinea[1]:linea;
-    if(regexPartido.test(equipos) && (!/^canales?\s*:/i.test(linea))){
-      vaciarBloque();bloque={equipos,hora:partidoEnLinea?limpiarHora(partidoEnLinea[2]):'',canales:[],pais:paisDefault};continue;
-    }
-    if(!bloque)continue;
-    const h=limpiarHora(linea);
-    if(h && (/^(?:hora|inicio|kickoff|horario)\s*:/i.test(linea)||/^\d{2}:\d{2}$/.test(linea))){bloque.hora=h;continue;}
-    const m=linea.match(/^(?:canales?|tv|transmisi[oó]n|d[oó]nde ver)\s*:\s*(.+)$/i);
-    if(m){bloque.canales.push(...m[1].split(/\s*[,/]\s*/).filter(Boolean));continue;}
-    const c=linea.match(/^pa[ií]s\s*:\s*(.+)$/i);
-    if(c){bloque.pais=c[1].trim();continue;}
+  const horaRe=/^([01]?\d|2[0-3]):([0-5]\d)$/;
+  const parseHora=x=>{const m=String(x).trim().match(horaRe);return m?m[1].padStart(2,'0')+':'+m[2]:null;};
+  const ligaRe=/^[▴▾▲▼]\s*(.+)$/;
+  const partidas=[];const avisos=[];
+  let liga='',hora='',pendiente=null;
+  function markdownPlano(celda){
+    return String(celda||'').replace(/<br\s*\/?\s*>/gi,' ')
+      .replace(/\[([^\]]+)\]\(https?:\/\/[^\s)]+(?:\s+"[^"]*")?\)/g,'$1')
+      .replace(/\*\*/g,'').replace(/&nbsp;|&#160;/gi,' ').replace(/\u00a0/g,' ').trim();
   }
-  vaciarBloque();
-  const unicos=[];const claves=new Set();
-  for(const p of partidos){const k=[p.local,p.visitante,p.hora,p.canal,p.pais].map(x=>x.toLowerCase()).join('|');if(!claves.has(k)){claves.add(k);unicos.push(p);}}
-  const seleccion=unicos.slice(0,100);
-  estado.textContent=`${unicos.length} registros reconocidos · ${descartes.length} líneas/bloques incompletos · ${seleccion.length} preparados para revisión.`;
+  function guardar(){
+    if(!pendiente)return;
+    const item=pendiente;pendiente=null;
+    const match=item.equipos.match(regexPartido);
+    if(!match||!item.hora){avisos.push('Partido sin hora válida: '+item.equipos);return;}
+    partidas.push({local:match[1].trim(),visitante:match[2].trim(),hora:item.hora,liga:item.liga,canales:item.canales.filter(Boolean)});
+  }
+  for(const linea of lineas){
+    // Las tablas Markdown tienen filas delimitadas por |. No confundirlas con el formato sencillo.
+    if(linea.startsWith('|')&&linea.endsWith('|')){
+      const cols=linea.slice(1,-1).split('|').map(x=>x.trim());
+      if(cols.length>=3){
+        if(/^:?-{3,}:?$/.test(cols[0]))continue;
+        const cab=markdownPlano(cols[0]).match(ligaRe);
+        if(cab){guardar();liga=cab[1];hora='';continue;}
+        const horaTabla=parseHora(markdownPlano(cols[0]));
+        const encuentro=markdownPlano(cols[1]);
+        const equipos=encuentro.match(regexPartido);
+        if(horaTabla&&equipos){
+          guardar();
+          const canales=markdownPlano(cols.slice(2).join(' | ')).split(/\s*,\s*/).filter(Boolean);
+          partidas.push({local:equipos[1].trim(),visitante:equipos[2].trim(),hora:horaTabla,liga,canales});
+        }
+        continue;
+      }
+    }
+    const cabecera=linea.match(ligaRe);
+    if(cabecera){guardar();liga=cabecera[1].trim();hora='';continue;}
+    const horaLinea=parseHora(linea);
+    if(horaLinea){guardar();hora=horaLinea;continue;}
+    const columnas=linea.split(/\s*[|;\t]\s*/).map(x=>x.trim());
+    if(columnas.length>=3&&regexPartido.test(columnas[0])&&parseHora(columnas[1])){
+      guardar();
+      const m=columnas[0].match(regexPartido);
+      partidas.push({local:m[1].trim(),visitante:m[2].trim(),hora:parseHora(columnas[1]),liga,canales:columnas[2].split(/\s*,\s*/).filter(Boolean),pais:columnas[3]||''});
+      continue;
+    }
+    const equipos=linea.match(regexPartido);
+    if(equipos){guardar();pendiente={equipos:linea,hora,liga,canales:[]};continue;}
+    if(!pendiente)continue;
+    const canalLinea=linea.replace(/^(?:canales?|tv|transmisi[oó]n|d[oó]nde ver)\s*:\s*/i,'');
+    if(canalLinea&&!/^https?:\/\//i.test(canalLinea))pendiente.canales.push(...canalLinea.split(/\s*,\s*/).map(x=>x.trim()).filter(Boolean));
+  }
+  guardar();
+  const unicos=[];const keys=new Set();
+  for(const p of partidas){const key=[p.local,p.visitante,p.hora].join('|').toLowerCase();if(!keys.has(key)){keys.add(key);unicos.push(p);}}
+  const conCanal=unicos.filter(p=>p.canales.length).length;
+  const sinCanal=unicos.length-conCanal;
+  const filas=[];
+  for(const p of unicos){
+    const pais=normalizarPaisEmision(p.pais||paisDefault);
+    if(!p.canales.length)continue;
+    if(!regionPais(pais))continue;
+    if($('iaRegion').value!=='ambas'&&regionPais(pais)!==$('iaRegion').value)continue;
+    for(const canal of p.canales){
+      filas.push({local:p.local,visitante:p.visitante,hora:p.hora,canal,fuente,pais});
+    }
+  }
+  const seleccion=filas.slice(0,100);
+  estado.textContent=`${unicos.length} partidos reconocidos · ${conCanal} con canales · ${sinCanal} sin canal · ${filas.length} registros válidos · ${seleccion.length} preparados.`;
+  if(!paisDefault&&unicos.some(p=>!p.pais)){
+    const nota=document.createElement('p');nota.className='notice';
+    nota.textContent='Selecciona el país de emisión antes de preparar el JSON. El país de la liga NO indica dónde transmite cada canal; la guía mezcla señales de varios países.';
+    dest.append(nota);
+  }
+  const aviso=document.createElement('p');aviso.className='muted';
+  aviso.textContent='Los horarios se interpretan como hora de Panamá. Confirma la zona horaria de la guía original. El país seleccionado se aplica a todos los canales, por lo que debes corregir los países individualmente en el JSON si son diferentes.';
+  dest.append(aviso);
+  for(const p of unicos){
+    const d=document.createElement('div');d.className='notice';
+    const t=document.createElement('strong');t.textContent=`${p.local} vs ${p.visitante} · ${p.hora} (Panamá)`;
+    const subt=document.createElement('p');subt.className='muted';subt.textContent=(p.liga?p.liga+' · ':'')+(p.canales.length?p.canales.join(' · '):'Sin canal anunciado');
+    d.append(t,subt);dest.append(d);
+  }
   if(seleccion.length){
     $('iaTexto').value=JSON.stringify({fecha,zona_horaria:'America/Panama',partidos:seleccion},null,2);
-    const nota=document.createElement('p');nota.className='muted';
-    nota.textContent='Se preparó el JSON de Programación IA. Comprueba equipos, canales, países y horarios antes de pulsar «Analizar programación en Admin». Nada se ha publicado.';
-    dest.append(nota);
-    for(const p of seleccion){const d=document.createElement('div');d.className='notice';d.textContent=`${p.local} vs ${p.visitante} · ${p.hora} Panamá · ${p.canal} (${p.pais})`;dest.append(d);}
+    const n=document.createElement('p');n.className='notice';n.textContent=`JSON preparado con ${seleccion.length} registros. Revisa los países y canales antes de pulsar «Analizar programación en Admin». No se ha publicado ninguna transmisión.`;dest.prepend(n);
+  }else{
+    $('iaTexto').value='';
+    const n=document.createElement('p');n.className='notice';n.textContent='No se generó JSON importable. Selecciona un país de emisión o revisa si los partidos tienen canales anunciados.';dest.prepend(n);
   }
-  if(descartes.length){const pre=document.createElement('pre');pre.className='muted';pre.style.whiteSpace='pre-wrap';pre.textContent='Revisar manualmente:\n'+descartes.slice(0,20).join('\n');dest.append(pre);}
-  if(!seleccion.length){const n=document.createElement('p');n.className='muted';n.textContent='No se reconocieron registros completos. Usa el formato: Equipo A vs Equipo B | 19:00 | Canal | PA';dest.append(n);}
+  if(filas.length>100){const n=document.createElement('p');n.className='notice';n.textContent=`La función schedule-import admite 100 registros por solicitud. Se prepararon los primeros 100 de ${filas.length}; los demás quedan en la vista previa y no se importaron.`;dest.prepend(n);}
+  if(avisos.length){const n=document.createElement('p');n.className='muted';n.textContent=avisos.slice(0,10).join(' · ');dest.append(n);}
 }
 
 // La IA o una lista externa aporta datos; la función verifica y registra, sin publicar.
