@@ -93,6 +93,14 @@ button:disabled{opacity:.55;cursor:not-allowed}
       <input id="iaZona" value="America/Panama" readonly aria-label="Zona horaria">
       <select id="iaRegion" aria-label="Cobertura de programación"><option value="ambas">Latinoamérica y Europa</option><option value="latam">Solo Latinoamérica</option><option value="europa">Solo Europa</option></select>
     </div>
+    <div class="notice" id="lectorURL">
+      <h3>🌐 Importar programación desde URL</h3>
+      <p class="muted">Lee fuentes HTTPS autorizadas en formato JSON, XMLTV o tablas HTML compatibles. La lectura solo prepara resultados: no activa ni publica canales.</p>
+      <input id="iaFuenteURL" type="url" placeholder="https://tu-proveedor.com/programacion.json" aria-label="URL de programación" autocomplete="url">
+      <button id="iaLeerURL" onclick="leerProgramacionURL()" style="background:#087e70">Leer URL y buscar partidos/canales</button>
+      <p id="iaUrlEstado" class="muted" role="status"></p>
+      <div id="iaUrlResultados" aria-live="polite"></div>
+    </div>
     <button id="iaAuto" onclick="consultarProgramacionAutomatica()" style="background:#087e70">Consultar programación automáticamente</button>
     <p id="iaAutoEstado" class="muted" role="status"></p>
     <div id="iaAutoResultados" aria-live="polite"></div>
@@ -363,6 +371,44 @@ async function consultarProgramacionAutomatica(){
     }
   }catch(e){estado.textContent='No se pudo consultar la programación: '+String(e?.message||e);}
   finally{btn.disabled=false;}
+}
+
+// Lector de URLs: el servidor verifica autorización y lista permitida de dominios.
+async function leerProgramacionURL(){
+  const boton=$('iaLeerURL'),estado=$('iaUrlEstado'),dest=$('iaUrlResultados');
+  const fuente=$('iaFuenteURL').value.trim();
+  let url;
+  try{url=new URL(fuente);if(url.protocol!=='https:')throw Error('HTTPS requerido');}
+  catch{estado.textContent='Introduce una URL HTTPS válida.';return;}
+  boton.disabled=true;dest.replaceChildren();estado.textContent='Leyendo la fuente de programación...';
+  try{
+    const {data,error}=await sb.functions.invoke('schedule-url-reader',{body:{url:fuente,fecha:$('iaFecha').value||new Date().toLocaleDateString('en-CA',{timeZone:'America/Panama'})}});
+    if(error){let detalle='';try{detalle=await error.context?.text?.()||'';}catch{}
+      throw new Error(error.message+(detalle?' · '+detalle.slice(0,300):''));}
+    if(!data?.ok)throw new Error(String(data?.error||'Respuesta inválida'));
+    const encontrados=Array.isArray(data.partidos)?data.partidos:[];
+    estado.textContent=`${encontrados.length} registros leídos · Formato: ${data.formato||'desconocido'} · ${data.descartados||0} descartados.`;
+    if(!encontrados.length){dest.textContent='La fuente no contiene partidos reconocibles con equipos y hora. Revisa el formato de la página.';return;}
+    const candidatos=[];
+    for(const p of encontrados){
+      const div=document.createElement('div');div.className='notice';
+      const titulo=document.createElement('strong');titulo.textContent=`${p.local} vs ${p.visitante} · ${p.hora} (Panamá)`;
+      const sub=document.createElement('p');sub.className='muted';sub.textContent=`${p.canal||'Sin canal'} · ${p.pais||'País sin identificar'} · ${p.fuente||fuente}`;
+      div.append(titulo,sub);dest.append(div);
+      if(p.canal && p.pais && p.fuente && regionPais(normalizarPaisEmision(p.pais))){
+        const zona=regionPais(normalizarPaisEmision(p.pais));
+        if($('iaRegion').value==='ambas'||$('iaRegion').value===zona)candidatos.push({...p,pais:normalizarPaisEmision(p.pais)});
+      }
+    }
+    if(candidatos.length){
+      $('iaTexto').value=JSON.stringify({fecha:$('iaFecha').value||data.fecha,zona_horaria:'America/Panama',partidos:candidatos.slice(0,100)},null,2);
+      const nota=document.createElement('p');nota.className='muted';nota.textContent=`${Math.min(100,candidatos.length)} registros preparados en el JSON. Revísalos y pulsa «Analizar programación en Admin» para comparar canales; no se han importado todavía.`;
+      dest.prepend(nota);
+    }else{
+      const nota=document.createElement('p');nota.className='muted';nota.textContent='Se encontraron partidos, pero ninguno reúne canal, país y fuente HTTPS de la región seleccionada. No se importará información incompleta.';dest.prepend(nota);
+    }
+  }catch(e){estado.textContent='No se pudo leer la URL: '+String(e?.message||e);}
+  finally{boton.disabled=false;}
 }
 
 // La IA o una lista externa aporta datos; la función verifica y registra, sin publicar.
