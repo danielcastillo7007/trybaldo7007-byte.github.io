@@ -11,7 +11,7 @@ body{margin:0;background:#07101b;color:#eaf2fb;font-family:Arial,sans-serif}
 main{max-width:1000px;margin:auto;padding:24px}
 h1{margin:0 0 6px}
 .card{background:#0d1a29;border:1px solid #1d334a;border-radius:16px;padding:18px;margin:14px 0}
-input,textarea,button{width:100%;padding:12px;border-radius:10px;border:1px solid #2a4560;background:#091522;color:#fff}
+input,textarea,button,select{width:100%;padding:12px;border-radius:10px;border:1px solid #2a4560;background:#091522;color:#fff}
 textarea{resize:vertical;font-family:monospace;font-size:12px}
 button{cursor:pointer;background:#1677ff;border:0;font-weight:700;margin-top:8px}
 button:disabled{opacity:.55;cursor:not-allowed}
@@ -91,12 +91,13 @@ button:disabled{opacity:.55;cursor:not-allowed}
     <div class="grid">
       <input id="iaFecha" type="date" aria-label="Fecha de programación">
       <input id="iaZona" value="America/Panama" readonly aria-label="Zona horaria">
+      <select id="iaRegion" aria-label="Cobertura de programación"><option value="ambas">Latinoamérica y Europa</option><option value="latam">Solo Latinoamérica</option><option value="europa">Solo Europa</option></select>
     </div>
     <button id="iaAuto" onclick="consultarProgramacionAutomatica()" style="background:#087e70">Consultar programación automáticamente</button>
     <p id="iaAutoEstado" class="muted" role="status"></p>
     <div id="iaAutoResultados" aria-live="polite"></div>
-    <p class="muted">Formato: partidos con local, visitante, hora (HH:MM), canal (nombre exacto en Admin), fuente (URL HTTPS) y pais (PA).</p>
-    <textarea id="iaTexto" rows="10" spellcheck="false" placeholder='{"partidos":[{"local":"Equipo A","visitante":"Equipo B","hora":"19:00","canal":"Canal deportivo","fuente":"https://ejemplo.com/programacion","pais":"PA"}]}'></textarea>
+    <p class="muted">Formato: partidos con local, visitante, hora de Panamá (HH:MM), canal, fuente (URL HTTPS) y país de emisión (ej. AR, MX, ES, GB). Cobertura: Latinoamérica y Europa.</p>
+    <textarea id="iaTexto" rows="10" spellcheck="false" placeholder='{"partidos":[{"local":"Equipo A","visitante":"Equipo B","hora":"19:00","canal":"Canal deportivo","fuente":"https://ejemplo.com/programacion","pais":"ES"}]}'></textarea>
     <button class="secondary" onclick="ejemploProgramacion()">Ver ejemplo de formato</button>
     <button id="iaEnviar" onclick="importarProgramacion()">Analizar programación en Admin</button>
     <p id="iaEstado" class="muted" role="status"></p>
@@ -276,6 +277,18 @@ async function addBulkM3U(){
 }
 
 
+// País de la señal, independiente de la zona horaria del partido.
+const PAISES_LATAM='AR BO BR CL CO CR CU DO EC SV GT HN MX NI PA PY PE PR UY VE BZ HT JM TT GY SR GF'.split(' ');
+const PAISES_EUROPA='AL AD AT BE BA BG HR CY CZ DK EE FI FR DE GR HU IS IE IT XK LV LI LT LU MT MD MC ME NL MK NO PL PT RO SM RS SK SI ES SE CH TR UA GB UK VA BY GE AM AZ'.split(' ');
+const ALIAS_PAISES={panama:'PA',panamá:'PA',argentina:'AR',mexico:'MX',méxico:'MX',colombia:'CO',brasil:'BR',brazil:'BR',chile:'CL',peru:'PE',perú:'PE',uruguay:'UY',paraguay:'PY',ecuador:'EC',bolivia:'BO',venezuela:'VE',costarica:'CR',guatemala:'GT',honduras:'HN',elsalvador:'SV',nicaragua:'NI',republicadominicana:'DO',puertorico:'PR',espana:'ES',españa:'ES',spain:'ES',francia:'FR',france:'FR',alemania:'DE',germany:'DE',italia:'IT',italy:'IT',portugal:'PT',inglaterra:'GB',reinounido:'GB',unitedkingdom:'GB',uk:'GB',england:'GB',paisesbajos:'NL',holanda:'NL',netherlands:'NL',belgica:'BE',belgium:'BE',suiza:'CH',switzerland:'CH'};
+function normalizarPaisEmision(valor){
+  const raw=String(valor||'').trim();
+  const clave=raw.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z]/g,'');
+  const codigo=ALIAS_PAISES[clave]||raw.toUpperCase();
+  return codigo==='UK'?'GB':codigo;
+}
+function regionPais(pais){return PAISES_LATAM.includes(pais)?'latam':PAISES_EUROPA.includes(pais)?'europa':'';}
+
 // Consulta autenticada a sports-schedule, sin exponer claves privadas.
 async function consultarProgramacionAutomatica(){
   const btn=$('iaAuto'),estado=$('iaAutoEstado'),dest=$('iaAutoResultados');
@@ -287,7 +300,8 @@ async function consultarProgramacionAutomatica(){
   try{
     const {data:{session},error:authError}=await sb.auth.getSession();
     if(authError || !session?.access_token)throw new Error('Inicia sesión nuevamente para consultar la programación.');
-    const url=SUPABASE_URL+'/functions/v1/sports-schedule?fecha='+encodeURIComponent(fecha);
+    const region=$('iaRegion').value;
+    const url=SUPABASE_URL+'/functions/v1/sports-schedule?fecha='+encodeURIComponent(fecha)+'&region='+encodeURIComponent(region);
     const respuesta=await fetch(url,{
       method:'GET',
       headers:{'Authorization':'Bearer '+session.access_token,'apikey':SUPABASE_PUBLISHABLE_KEY}
@@ -298,7 +312,9 @@ async function consultarProgramacionAutomatica(){
     }
     const partidos=Array.isArray(data.partidos)?data.partidos:[];
     const entradas=[];
+    const regionElegida=$('iaRegion').value;
     let partidosConCanales=0;
+    let canalesFueraRegion=0;
     for(const p of partidos){
       const div=document.createElement('div');div.className='notice';
       const titulo=document.createElement('strong');
@@ -316,18 +332,18 @@ async function consultarProgramacionAutomatica(){
       const nota=document.createElement('p');nota.className='muted';
       nota.textContent='Programación y derechos pendientes de verificar; ninguna señal publicada.';
       div.append(nota);dest.append(div);
-      // Solo los canales marcados explícitamente para Panamá se envían al importador.
-      // No se supone que un canal internacional tenga derechos en Panamá.
+      // Aceptar emisoras de Latinoamérica y Europa; mantener país de emisión real.
       for(const c of canales){
-        const pais=String(c.pais||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toLowerCase();
-        if(pais!=='panama' && pais!=='pa')continue;
+        const pais=normalizarPaisEmision(c.pais);
+        const zona=regionPais(pais);
+        if(!zona || (regionElegida!=='ambas' && zona!==regionElegida)){canalesFueraRegion++;continue;}
         if(!p.local || !p.visitante || !/^([01]\d|2[0-3]):[0-5]\d$/.test(String(p.hora_panama||'')))continue;
         if(!c.nombre || !/^https:\/\//i.test(String(c.fuente||'')))continue;
         entradas.push({local:String(p.local),visitante:String(p.visitante),hora:String(p.hora_panama),
-          canal:String(c.nombre),fuente:String(c.fuente),pais:'PA'});
+          canal:String(c.nombre),fuente:String(c.fuente),pais});
       }
     }
-    estado.textContent=`${partidos.length} partidos encontrados · ${partidosConCanales} con canales anunciados · ${entradas.length} coincidencias de programación marcadas para Panamá.`;
+    estado.textContent=`${partidos.length} partidos encontrados · ${partidosConCanales} con canales anunciados · ${entradas.length} registros de Latinoamérica/Europa listos para analizar.`;
     if(!partidos.length){
       const n=document.createElement('p');n.className='muted';
       n.textContent='La fuente no devolvió partidos para esta fecha.';dest.append(n);
@@ -342,7 +358,7 @@ async function consultarProgramacionAutomatica(){
       await importarProgramacion();
     }else{
       const n=document.createElement('p');n.className='muted';
-      n.textContent='No hay canales identificados específicamente para Panamá con datos completos. Se muestran los partidos para revisión; no se enviaron coincidencias al importador.';
+      n.textContent='No hay canales con fuente HTTPS y país identificado dentro de la región seleccionada. Se muestran los partidos para revisión.';
       dest.append(n);
     }
   }catch(e){estado.textContent='No se pudo consultar la programación: '+String(e?.message||e);}
@@ -355,7 +371,7 @@ function ejemploProgramacion(){
   $('iaFecha').value=fecha;
   $('iaTexto').value=JSON.stringify({fecha,zona_horaria:'America/Panama',partidos:[{
     local:'Equipo A',visitante:'Equipo B',hora:'19:00',canal:'Nombre exacto del canal en Admin',
-    fuente:'https://ejemplo.com/programacion',pais:'PA'
+    fuente:'https://ejemplo.com/programacion',pais:'ES'
   }]},null,2);
   $('iaEstado').textContent='Ejemplo ilustrativo: reemplaza equipos, canal, fecha y fuente con información real y verificable.';
 }
@@ -370,6 +386,7 @@ async function importarProgramacion(){
   }
   body.fecha=body.fecha||$('iaFecha').value;
   body.zona_horaria=body.zona_horaria||'America/Panama';
+  body.region=$('iaRegion').value;
   if(!/^\d{4}-\d{2}-\d{2}$/.test(body.fecha||'') || body.zona_horaria!=='America/Panama'){
     estado.textContent='Selecciona una fecha válida y utiliza America/Panama.';return;
   }
@@ -382,7 +399,7 @@ async function importarProgramacion(){
     }
     if(typeof p.hora==='string' && !/^([01]\d|2[0-3]):[0-5]\d$/.test(p.hora))errores.push(`Partido ${n}: hora inválida (HH:MM).`);
     if(typeof p.fuente==='string' && !/^https:\/\/[^\s]+$/i.test(p.fuente))errores.push(`Partido ${n}: fuente debe comenzar con https://.`);
-    if(p.pais!=='PA')errores.push(`Partido ${n}: pais debe ser PA.`);
+    if(typeof p.pais==='string' && p.pais.trim() && !regionPais(normalizarPaisEmision(p.pais)))errores.push(`Partido ${n}: país fuera de Latinoamérica y Europa o no reconocido.`);
   });
   if(errores.length){
     estado.textContent=`Se encontraron ${errores.length} errores. Corrige antes de importar.`;
@@ -400,7 +417,7 @@ async function importarProgramacion(){
       estado.textContent='Error al importar: '+error.message+(detail?' · '+detail.slice(0,400):'');return;
     }
     if(data?.ok===false){
-      estado.textContent='El servidor informó un problema: '+String(data.error||'Error desconocido');
+      estado.textContent='El servidor informó un problema: '+String(data.error||'Error desconocido')+'. Si menciona PA/Panamá, también hay que actualizar la función Edge schedule-import.';
       return;
     }
     // Compatible con las versiones anteriores (results) y actuales (resultados).
