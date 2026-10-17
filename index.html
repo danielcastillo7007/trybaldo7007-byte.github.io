@@ -571,7 +571,18 @@ async function importarProgramacion(){
       (typeof totalCanales==='number'?` Canales en Admin: ${totalCanales}.`:'')+
       (typeof totalCoincidencias==='number'?` Partidos con coincidencias: ${totalCoincidencias}.`:'')+
       ' Ninguna transmisión fue publicada automáticamente.';
-    for(const r of resultados){
+    // Mostrar primero los resultados que ofrecen «Activar canal».
+    // Orden estable: no altera el orden relativo dentro de cada grupo.
+    const puedeActivar=c=>c && c.habilitado!==true && typeof c.id==='string' && /^[0-9a-f-]{36}$/i.test(c.id);
+    const prioridadResultado=r=>Array.isArray(r.candidatos) && r.candidatos.some(puedeActivar) ? 0 : 1;
+    const resultadosOrdenados=[...resultados].sort((a,b)=>prioridadResultado(a)-prioridadResultado(b));
+    const activables=resultadosOrdenados.filter(r=>prioridadResultado(r)===0).length;
+    if(activables){
+      const avisoOrden=document.createElement('p');avisoOrden.className='notice';
+      avisoOrden.textContent=`${activables} resultados con opción «Activar canal» aparecen primero.`;
+      dest.append(avisoOrden);
+    }
+    for(const r of resultadosOrdenados){
       const div=document.createElement('div');div.className='notice';
       const titulo=document.createElement('strong');
       const partido=r.match||[r.local,r.visitante].filter(Boolean).join(' vs ')||'Partido';
@@ -587,7 +598,7 @@ async function importarProgramacion(){
         resumen.textContent=`${candidatos.length} canales candidatos:`;
         div.append(resumen);
         const lista=document.createElement('ul');
-        for(const c of candidatos){
+        for(const c of [...candidatos].sort((a,b)=>Number(puedeActivar(b))-Number(puedeActivar(a)))){
           const li=document.createElement('li');
           li.textContent=String(c.nombre||'Sin nombre')+
             (typeof c.puntuacion==='number'?` · coincidencia ${c.puntuacion}%`:'')+
