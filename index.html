@@ -433,6 +433,35 @@ async function importarProgramacion(){
           li.textContent=String(c.nombre||'Sin nombre')+
             (typeof c.puntuacion==='number'?` · coincidencia ${c.puntuacion}%`:'')+
             (c.habilitado===true?' · activo':c.habilitado===false?' · desactivado':'');
+          // Activación individual desde el resultado de Programación IA.
+          // Solo cambia streams.enabled, igual que el control habitual del Admin.
+          if (typeof c.id === 'string' && /^[0-9a-f-]{36}$/i.test(c.id)) {
+            const boton=document.createElement('button');
+            boton.className='secondary switch';
+            boton.style.width='auto';
+            boton.style.marginLeft='10px';
+            boton.textContent=c.habilitado===true?'Desactivar canal':'Activar canal';
+            boton.addEventListener('click',async()=>{
+              const nuevoEstado=c.habilitado!==true;
+              boton.disabled=true;
+              const textoAnterior=boton.textContent;
+              boton.textContent='Guardando...';
+              const {error}=await sb.from('streams').update({enabled:nuevoEstado}).eq('id',c.id);
+              if(error){
+                boton.textContent=textoAnterior;
+                alert('No se pudo actualizar el canal: '+error.message);
+              }else{
+                c.habilitado=nuevoEstado;
+                li.firstChild.textContent=String(c.nombre||'Sin nombre')+
+                  (typeof c.puntuacion==='number'?` · coincidencia ${c.puntuacion}%`:'')+
+                  (nuevoEstado?' · activo':' · desactivado');
+                boton.textContent=nuevoEstado?'Desactivar canal':'Activar canal';
+                await loadStreams();
+              }
+              boton.disabled=false;
+            });
+            li.append(boton);
+          }
           lista.append(li);
         }
         div.append(lista);
