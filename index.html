@@ -101,6 +101,19 @@ button:disabled{opacity:.55;cursor:not-allowed}
       <p id="iaUrlEstado" class="muted" role="status"></p>
       <div id="iaUrlResultados" aria-live="polite"></div>
     </div>
+    <div class="notice" id="lectorTexto" style="border-color:#236f55">
+      <h3>📋 Analizar programación copiada</h3>
+      <p class="muted">Pega texto de una guía que tengas permiso de utilizar. Reconoce líneas como «Equipo A vs Equipo B | 19:00 | ESPN | PA», o bloques con partido, hora y «Canales: ...». No consulta la web ni inventa canales.</p>
+      <textarea id="iaPegarTexto" rows="8" placeholder="Equipo A vs Equipo B | 19:00 | ESPN | PA&#10;Equipo C vs Equipo D | 20:30 | DSports | AR"></textarea>
+      <div class="grid" style="margin-top:8px">
+        <input id="iaPegarFuente" type="url" placeholder="https://fuente-original.com/programacion" aria-label="URL de la fuente del texto">
+        <select id="iaPegarPais" aria-label="País predeterminado de emisión"><option value="">País por registro (sin predeterminado)</option><option value="PA">Panamá (PA)</option><option value="AR">Argentina (AR)</option><option value="MX">México (MX)</option><option value="CO">Colombia (CO)</option><option value="ES">España (ES)</option><option value="GB">Reino Unido (GB)</option><option value="BR">Brasil (BR)</option><option value="CL">Chile (CL)</option><option value="PE">Perú (PE)</option><option value="UY">Uruguay (UY)</option></select>
+      </div>
+      <p class="muted">Indica las horas en horario de Panamá (HH:MM). Para horas de otro país, conviértelas antes de analizar. Puedes corregir los resultados en el JSON antes de importar.</p>
+      <button id="iaProcesarTexto" onclick="analizarTextoCopiado()" style="background:#147d50">Extraer partidos y canales del texto</button>
+      <p id="iaPegarEstado" class="muted" role="status"></p>
+      <div id="iaPegarResultados" aria-live="polite"></div>
+    </div>
     <button id="iaAuto" onclick="consultarProgramacionAutomatica()" style="background:#087e70">Consultar programación automáticamente</button>
     <p id="iaAutoEstado" class="muted" role="status"></p>
     <div id="iaAutoResultados" aria-live="polite"></div>
@@ -409,6 +422,77 @@ async function leerProgramacionURL(){
     }
   }catch(e){estado.textContent='No se pudo leer la URL: '+String(e?.message||e);}
   finally{boton.disabled=false;}
+}
+
+// Análisis local y revisable de texto pegado: sin scraping ni llamadas a IA.
+function analizarTextoCopiado(){
+  const estado=$('iaPegarEstado'),dest=$('iaPegarResultados');dest.replaceChildren();
+  const texto=$('iaPegarTexto').value.trim();
+  const fuente=$('iaPegarFuente').value.trim();
+  const paisDefault=$('iaPegarPais').value;
+  const fecha=$('iaFecha').value||new Date().toLocaleDateString('en-CA',{timeZone:'America/Panama'});
+  $('iaFecha').value=fecha;
+  if(!texto){estado.textContent='Primero pega la programación que deseas analizar.';return;}
+  let fuenteValida=false;
+  try{const u=new URL(fuente);fuenteValida=u.protocol==='https:';}catch{}
+  if(!fuenteValida){estado.textContent='Indica la URL HTTPS de la fuente original para conservar la referencia.';return;}
+  const partidos=[];const descartes=[];
+  const lineas=texto.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
+  // Reconoce separadores |, tabulador o punto y coma, y bloques de varias líneas.
+  const regexPartido=/^(.+?)\s+(?:vs\.?|v\.?|versus|contra|–|—|-)\s+(.+?)$/i;
+  const horaRe=/\b([01]\d|2[0-3]):([0-5]\d)\b/;
+  const limpiarHora=x=>{const m=String(x||'').match(horaRe);return m?m[0]:'';};
+  const normalPais=x=>normalizarPaisEmision(String(x||'').replace(/^pa[ií]s\s*:\s*/i,'').trim());
+  const crear=(equipos,hora,canal,pais,linea)=>{
+    const match=String(equipos||'').trim().match(regexPartido);
+    if(!match||!hora){descartes.push('No se reconoció partido/hora: '+String(linea).slice(0,110));return;}
+    const p={local:match[1].trim(),visitante:match[2].trim(),hora,canal:String(canal||'').trim(),fuente,pais:normalPais(pais||paisDefault)};
+    if(!p.canal || !regionPais(p.pais)){
+      descartes.push('Falta canal o país válido: '+String(linea).slice(0,110));return;
+    }
+    partidos.push(p);
+  };
+  let bloque=null;
+  const vaciarBloque=()=>{
+    if(!bloque)return;
+    const canales=bloque.canales.length?bloque.canales:[''];
+    for(const canal of canales)crear(bloque.equipos,bloque.hora,canal,bloque.pais,bloque.equipos);
+    bloque=null;
+  };
+  for(const linea of lineas){
+    const partes=linea.split(/\s*[|;\t]\s*/).map(x=>x.trim()).filter(Boolean);
+    if(partes.length>=3 && regexPartido.test(partes[0]) && limpiarHora(partes[1])){
+      vaciarBloque();
+      const canal=partes[2];const pais=partes[3]||paisDefault;
+      crear(partes[0],limpiarHora(partes[1]),canal,pais,linea);continue;
+    }
+    const partidoEnLinea=linea.match(/^(.*?)\s*[·|]\s*(\d{2}:\d{2})(?:\s*\([^)]*\))?$/);
+    const equipos=partidoEnLinea?partidoEnLinea[1]:linea;
+    if(regexPartido.test(equipos) && (!/^canales?\s*:/i.test(linea))){
+      vaciarBloque();bloque={equipos,hora:partidoEnLinea?limpiarHora(partidoEnLinea[2]):'',canales:[],pais:paisDefault};continue;
+    }
+    if(!bloque)continue;
+    const h=limpiarHora(linea);
+    if(h && (/^(?:hora|inicio|kickoff|horario)\s*:/i.test(linea)||/^\d{2}:\d{2}$/.test(linea))){bloque.hora=h;continue;}
+    const m=linea.match(/^(?:canales?|tv|transmisi[oó]n|d[oó]nde ver)\s*:\s*(.+)$/i);
+    if(m){bloque.canales.push(...m[1].split(/\s*[,/]\s*/).filter(Boolean));continue;}
+    const c=linea.match(/^pa[ií]s\s*:\s*(.+)$/i);
+    if(c){bloque.pais=c[1].trim();continue;}
+  }
+  vaciarBloque();
+  const unicos=[];const claves=new Set();
+  for(const p of partidos){const k=[p.local,p.visitante,p.hora,p.canal,p.pais].map(x=>x.toLowerCase()).join('|');if(!claves.has(k)){claves.add(k);unicos.push(p);}}
+  const seleccion=unicos.slice(0,100);
+  estado.textContent=`${unicos.length} registros reconocidos · ${descartes.length} líneas/bloques incompletos · ${seleccion.length} preparados para revisión.`;
+  if(seleccion.length){
+    $('iaTexto').value=JSON.stringify({fecha,zona_horaria:'America/Panama',partidos:seleccion},null,2);
+    const nota=document.createElement('p');nota.className='muted';
+    nota.textContent='Se preparó el JSON de Programación IA. Comprueba equipos, canales, países y horarios antes de pulsar «Analizar programación en Admin». Nada se ha publicado.';
+    dest.append(nota);
+    for(const p of seleccion){const d=document.createElement('div');d.className='notice';d.textContent=`${p.local} vs ${p.visitante} · ${p.hora} Panamá · ${p.canal} (${p.pais})`;dest.append(d);}
+  }
+  if(descartes.length){const pre=document.createElement('pre');pre.className='muted';pre.style.whiteSpace='pre-wrap';pre.textContent='Revisar manualmente:\n'+descartes.slice(0,20).join('\n');dest.append(pre);}
+  if(!seleccion.length){const n=document.createElement('p');n.className='muted';n.textContent='No se reconocieron registros completos. Usa el formato: Equipo A vs Equipo B | 19:00 | Canal | PA';dest.append(n);}
 }
 
 // La IA o una lista externa aporta datos; la función verifica y registra, sin publicar.
