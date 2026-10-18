@@ -17,10 +17,7 @@ button.secondary,.secondary{background:#253246}button.danger,.danger{background:
 .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px}.hidden{display:none!important}.ok{color:#55d49c}.off{color:#fa959c}.badge{display:inline-flex;padding:4px 10px;border-radius:99px;background:#23344b;font-size:12px;font-weight:650}
 .notice{padding:13px;border-radius:11px;background:#152337;border:1px solid #29425c;margin:12px 0}.row{display:flex;justify-content:space-between;gap:16px;align-items:center;border-top:1px solid #253144;padding:14px 0}.row:first-child{border-top:0}.actions{display:flex;flex-wrap:wrap;gap:7px;min-width:210px;justify-content:flex-end}.switch{width:auto;padding:8px 12px;margin:0;font-size:13px}
 .topbar{display:flex;align-items:center;justify-content:space-between;gap:15px;margin-bottom:16px}.brand-icon{width:38px;height:38px;display:inline-grid;place-items:center;background:linear-gradient(150deg,#2978d8,#6e63c4);border-radius:13px;font-weight:850}.brand{display:flex;align-items:center;gap:12px}.toolbar{display:flex;gap:8px;flex-wrap:wrap}.toolbar a{display:inline-flex;text-decoration:none;align-items:center;padding:9px 13px;color:#d8e7fd;background:#162439;border:1px solid #2b405a;border-radius:10px;font-size:13px}.toolbar a:hover{background:#223852}.eyebrow{font-size:11px;font-weight:750;letter-spacing:1.4px;text-transform:uppercase;color:#7f9dc5}.section-head{display:flex;justify-content:space-between;align-items:center;gap:12px}.compact-status{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}.compact-status button{width:auto;padding:9px 14px;margin:0}.compact-status p{margin:0}.muted-url{word-break:break-word;overflow-wrap:anywhere;max-width:620px}.stream-info{min-width:0;flex:1}.stream-title{font-size:15px}.stream-meta{margin-top:5px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}.tag{background:#19283b;border:1px solid #2b3e55;border-radius:7px;padding:2px 7px;font-size:11px;color:#adc5e2}.stream-list-header{display:flex;gap:10px;flex-wrap:wrap;margin:16px 0}.stream-list-header input{flex:2;min-width:180px}.stream-list-header select{flex:1;min-width:145px}.summary-line{margin:0 0 10px}.more{margin:14px 0}.more summary{list-style:none;cursor:pointer;padding:12px 14px;border-radius:11px;background:#192638;border:1px solid #2e4058;font-weight:650}.more summary::after{content:'⌄';float:right;color:#9aa9bd}.more[open] summary::after{content:'⌃'}.more>div{padding:12px 2px 2px}.editing{border-color:#4d87ce;box-shadow:0 0 0 1px #4d87ce50}.edit-label{display:block;margin:8px 0 5px;font-size:12px;color:#b7c9dc}.edit-actions{display:flex;gap:8px}.edit-actions button{flex:1}.btn-danger-outline{background:transparent!important;border:1px solid #84545a!important;color:#ffb2b7}
-.expiry-line{margin-top:6px;font-size:12px;color:#b7c9df}.expiry-line.warning{color:#ffcc7b}.expiry-line.expired{color:#ff9a9a}.expiry-line.valid{color:#80d8a7}.expiry-line .expiry-note{font-size:11px;color:#9faec0}
 @media(max-width:720px){main{padding:15px 12px 60px}.grid{grid-template-columns:1fr}.card{padding:16px;margin:13px 0}.row{display:block}.actions{margin-top:12px;justify-content:flex-start;min-width:0}.actions button{flex:1}.topbar{display:block}.toolbar{margin-top:14px}.stream-list-header{display:block}.stream-list-header select{margin-top:8px}}
-
-.catalog-layout{display:grid;grid-template-columns:2fr 1fr 1fr;gap:9px}.catalog-table{max-height:490px;overflow:auto;margin-top:12px;border:1px solid var(--edge);border-radius:12px}.catalog-item{display:flex;gap:12px;align-items:center;justify-content:space-between;padding:13px;border-bottom:1px solid var(--edge)}.catalog-item:last-child{border-bottom:0}.catalog-item .info{min-width:0;flex:1}.catalog-item .info p{font-size:12px;margin:3px 0;color:var(--muted)}.catalog-item button{width:auto;margin:0;white-space:nowrap}.catalog-controls{display:flex;flex-wrap:wrap;align-items:center;gap:12px}.catalog-controls input{width:auto}.catalog-icon{width:34px;height:34px;object-fit:contain;background:#eef1f5;border-radius:5px;padding:3px}.catalog-icon-placeholder{height:34px;width:34px;display:grid;place-items:center;border-radius:6px;background:#263950;flex-shrink:0}.catalog-link{word-break:break-all;font-size:12px;color:#a7bfd9}.catalog-pagination{display:flex;gap:12px;align-items:center;justify-content:space-between;margin:10px 0}.catalog-pagination button{width:auto}.catalog-pagination button:disabled{opacity:.3}@media(max-width:720px){.catalog-layout{grid-template-columns:1fr}.catalog-item{flex-wrap:wrap}.catalog-item button{width:100%}}
 </style>
 </head>
 <body>
@@ -41,6 +38,13 @@ button.secondary,.secondary{background:#253246}button.danger,.danger{background:
     <h2 style="margin:0">Streaming global</h2>
     <p id="globalState">Cargando...</p>
     <button onclick="toggleGlobal()">Cambiar estado</button>
+  </div>
+
+  <div class="card compact-status" id="liveVisibilitySettings">
+    <h2 style="margin:0">Botón «En vivo» en la aplicación</h2>
+    <p class="muted">Oculta o muestra la pestaña «En vivo» en los teléfonos. No elimina ni desactiva ningún canal.</p>
+    <p id="liveTabVisibilityState" role="status">Consultando visibilidad...</p>
+    <button id="liveTabVisibilityButton" class="secondary" onclick="toggleLiveTabVisibility()" disabled>Esperando configuración...</button>
   </div>
 
   <div class="card" id="nuevoCanal">
@@ -122,20 +126,6 @@ button.secondary,.secondary{background:#253246}button.danger,.danger{background:
   </div>
 
   </div></details></div>
-
-  <div class="card" id="catalogoIPTV">
-    <div class="section-head"><h2>Catálogo IPTV-org</h2><span class="tag">Canales públicos</span></div>
-    <p class="muted">Busca canales y revisa sus enlaces públicos. IPTV-org recopila enlaces de la comunidad: no garantiza disponibilidad ni permisos de redistribución. Los canales que importes se guardan <b>desactivados</b> y no reemplazan los tuyos.</p>
-    <div class="catalog-layout">
-      <input id="catalogSearch" placeholder="Buscar por nombre..." aria-label="Buscar canal" oninput="catalogFilterChanged()">
-      <select id="catalogCountry" aria-label="País" onchange="catalogFilterChanged()"><option value="PA">Panamá</option><option value="ALL">Todos los países</option><option value="MX">México</option><option value="AR">Argentina</option><option value="CO">Colombia</option><option value="ES">España</option><option value="US">Estados Unidos</option><option value="BR">Brasil</option></select>
-      <select id="catalogCategory" aria-label="Categoría" onchange="catalogFilterChanged()"><option value="sports">Deportes</option><option value="all">Todas</option><option value="news">Noticias</option><option value="general">General</option><option value="entertainment">Entretenimiento</option></select>
-    </div>
-    <div class="catalog-controls" style="margin-top:8px"><button id="catalogLoadBtn" style="width:auto" onclick="loadIptvCatalog()">Consultar catálogo</button><label class="muted"><input type="checkbox" id="catalogWithStreams" checked onchange="catalogFilterChanged()"> Solo con enlace</label></div>
-    <p id="catalogStatus" class="muted" role="status" aria-live="polite">Pulsa Consultar catálogo para cargar los datos oficiales.</p>
-    <div class="catalog-table" id="catalogResults" aria-live="polite"></div>
-    <div class="catalog-pagination hidden" id="catalogPager"><button class="secondary" onclick="catalogPageChange(-1)">← Anterior</button><span id="catalogPageInfo" class="muted"></span><button class="secondary" onclick="catalogPageChange(1)">Siguiente →</button></div>
-  </div>
   <div class="card" id="misCanales">
     <div class="section-head"><h2>Mis transmisiones</h2><span id="streamCount" class="badge">—</span></div>
     <div class="stream-list-header"><input id="streamSearch" type="search" placeholder="Buscar por canal, liga o equipo..." aria-label="Buscar canales" oninput="renderStreams()"><select id="streamFilter" aria-label="Filtrar transmisiones" onchange="renderStreams()"><option value="all">Todos los canales</option><option value="active">Solo activos</option><option value="inactive">Solo desactivados</option></select></div>
@@ -198,7 +188,7 @@ button.secondary,.secondary{background:#253246}button.danger,.danger{background:
 const SUPABASE_URL='https://zinqmmwprwvtjipfwfqp.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY='sb_publishable_TSOF9M-eL9DvKj42QKerxA_uZeWGw9h';
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY);
-let globalEnabled=false, initializing=false;
+let globalEnabled=false, initializing=false, liveTabVisible=true;
 
 const $=id=>document.getElementById(id);
 
@@ -222,6 +212,7 @@ async function init(){
     }
     $('login').classList.add('hidden');$('panel').classList.remove('hidden');
     await loadGlobal();
+    await loadLiveTabVisibility();
     await loadStreams();
   } finally { initializing=false; }
 }
@@ -240,6 +231,26 @@ async function toggleGlobal(){
   const {error}=await sb.from('app_config')
     .upsert({key:'streaming_enabled',value:!globalEnabled});
   if(error)alert(error.message); else await loadGlobal();
+}
+
+// Visible por defecto para conservar el comportamiento de las instalaciones anteriores.
+async function loadLiveTabVisibility(){
+  const status=$('liveTabVisibilityState');
+  const button=$('liveTabVisibilityButton');
+  button.disabled=true;
+  const {data,error}=await sb.from('app_config').select('value').eq('key','live_tab_visible').maybeSingle();
+  if(error){status.textContent='Error: '+error.message;button.textContent='No disponible';return;}
+  liveTabVisible=data?.value!==false;
+  status.textContent=liveTabVisible?'🟢 Visible en la aplicación':'⚪ Oculto en la aplicación';
+  button.textContent=liveTabVisible?'Ocultar botón «En vivo»':'Mostrar botón «En vivo»';
+  button.disabled=false;
+}
+async function toggleLiveTabVisibility(){
+  const button=$('liveTabVisibilityButton');
+  button.disabled=true;
+  const {error}=await sb.from('app_config').upsert({key:'live_tab_visible',value:!liveTabVisible},{onConflict:'key'});
+  if(error){$('liveTabVisibilityState').textContent='No se pudo actualizar: '+error.message;button.disabled=false;return;}
+  await loadLiveTabVisibility();
 }
 
 async function addStream(){
@@ -796,101 +807,6 @@ async function setTodasLasTransmisiones(enabled){
   }
 }
 
-
-// Catálogo IPTV-org. Solo lectura pública y revisión manual; no actualiza los canales existentes.
-const IPTV_SOURCE='https://iptv-org.github.io/api/';
-let catalogData=null,catalogFiltered=[],catalogPage=0,catalogBusy=false;
-const CATALOG_PAGE_SIZE=15;
-function catalogFilterChanged(){catalogPage=0;renderIptvCatalog();}
-function catalogPageChange(direction){
-  const next=catalogPage+direction;
-  if(next<0||next>=Math.ceil(catalogFiltered.length/CATALOG_PAGE_SIZE))return;
-  catalogPage=next;renderIptvCatalog();
-}
-async function loadIptvCatalog(){
-  if(catalogBusy)return;
-  catalogBusy=true;
-  $('catalogLoadBtn').disabled=true;
-  $('catalogStatus').textContent='Consultando IPTV-org...';
-  try{
-    const names=['channels.json','streams.json','logos.json'];
-    const responses=await Promise.all(names.map(name=>fetch(IPTV_SOURCE+name,{cache:'no-store'})));
-    for(let i=0;i<responses.length;i++)if(!responses[i].ok)throw Error(names[i]+': HTTP '+responses[i].status);
-    const [channels,streams,logos]=await Promise.all(responses.map(r=>r.json()));
-    if(![channels,streams,logos].every(Array.isArray))throw Error('Formato JSON no reconocido');
-    const byChannel=new Map(),logoByChannel=new Map();
-    for(const s of streams){
-      if(!s?.channel||!/^https?:\/\//i.test(String(s.url||'')))continue;
-      if(!byChannel.has(s.channel))byChannel.set(s.channel,[]);
-      byChannel.get(s.channel).push(s);
-    }
-    for(const l of logos){if(l?.channel&&l.in_use&&!logoByChannel.has(l.channel)&&/^https:\/\//i.test(String(l.url||'')))logoByChannel.set(l.channel,l.url);}
-    catalogData=channels.filter(c=>c?.id&&c?.name&&!c.is_nsfw&&!c.closed).map(c=>({
-      id:c.id,name:c.name,country:c.country||'',categories:Array.isArray(c.categories)?c.categories:[],
-      logo:logoByChannel.get(c.id)||'',streams:byChannel.get(c.id)||[]
-    }));
-    catalogPage=0;renderIptvCatalog();
-  }catch(e){$('catalogStatus').textContent='No se pudo cargar el catálogo: '+String(e?.message||e)+'; revisa la conexión/CORS y vuelve a intentar.';}
-  finally{catalogBusy=false;$('catalogLoadBtn').disabled=false;}
-}
-function renderIptvCatalog(){
-  const results=$('catalogResults'),pager=$('catalogPager');
-  if(!catalogData){results.replaceChildren();pager.classList.add('hidden');return;}
-  const country=$('catalogCountry').value,category=$('catalogCategory').value;
-  const term=$('catalogSearch').value.toLocaleLowerCase().trim();
-  const linked=$('catalogWithStreams').checked;
-  catalogFiltered=catalogData.filter(c=>(country==='ALL'||c.country===country)&&
-    (category==='all'||c.categories.includes(category))&&(!linked||c.streams.length>0)&&
-    (!term||c.name.toLocaleLowerCase().includes(term)||c.id.toLocaleLowerCase().includes(term)));
-  const totalPages=Math.ceil(catalogFiltered.length/CATALOG_PAGE_SIZE);
-  catalogPage=Math.max(0,Math.min(catalogPage,totalPages-1));
-  $('catalogStatus').textContent=catalogFiltered.length+' canales encontrados · '+catalogFiltered.filter(c=>c.streams.length).length+' con enlaces públicos. Comprueba cada enlace y tus permisos antes de activarlo.';
-  const fragment=document.createDocumentFragment();
-  for(const c of catalogFiltered.slice(catalogPage*CATALOG_PAGE_SIZE,(catalogPage+1)*CATALOG_PAGE_SIZE)){
-    const row=document.createElement('div');row.className='catalog-item';
-    if(c.logo){const img=document.createElement('img');img.className='catalog-icon';img.alt='';img.loading='lazy';img.referrerPolicy='no-referrer';img.src=c.logo;row.append(img);}
-    else{const placeholder=document.createElement('span');placeholder.className='catalog-icon-placeholder';placeholder.textContent='TV';row.append(placeholder);}
-    const info=document.createElement('div');info.className='info';
-    const title=document.createElement('strong');title.textContent=c.name;
-    const meta=document.createElement('p');meta.textContent=c.country+' · '+c.categories.join(', ')+' · '+c.streams.length+' enlace(s)';
-    info.append(title,meta);
-    if(c.streams.length){
-      const select=document.createElement('select');select.style.fontSize='12px';select.setAttribute('aria-label','Enlace de '+c.name);
-      for(let i=0;i<c.streams.length;i++){
-        const s=c.streams[i],option=document.createElement('option');option.value=String(i);
-        option.textContent=(s.quality||'Calidad variable')+(s.labels?.length?' · '+s.labels.join(', '):'')+' · '+String(s.url).split('/')[2];select.append(option);
-      }
-      info.append(select);
-      const button=document.createElement('button');button.textContent='Importar';button.className='secondary';
-      button.onclick=()=>importIptvStream(c,Number(select.value),button);row.append(info,button);
-    }else{row.append(info);}
-    fragment.append(row);
-  }
-  results.replaceChildren(fragment);
-  pager.classList.toggle('hidden',totalPages<=1);
-  $('catalogPageInfo').textContent=totalPages?'Página '+(catalogPage+1)+' de '+totalPages:'';
-  pager.querySelector('button:first-child').disabled=catalogPage===0;
-  pager.querySelector('button:last-child').disabled=catalogPage>=totalPages-1;
-}
-async function importIptvStream(channel,index,button){
-  const s=channel.streams[index];if(!s)return;
-  if(!confirm('¿Guardar «'+channel.name+'» como DESACTIVADO? Verifica antes la disponibilidad y autorización del enlace.'))return;
-  // Guardado sin activar, sin alterar registros anteriores y sin publicar la señal.
-  const payload={match_id:null,match_name:channel.name,competition:channel.categories.includes('sports')?'Deportes':null,
-    stream_url:s.url,stream_format:/\.m3u8(?:[?#]|$)/i.test(s.url)?'hls':'auto',
-    referrer:s.referrer||null,user_agent:s.user_agent||null,enabled:false};
-  button.disabled=true;button.textContent='Guardando...';
-  try{
-    const {data:existing,error:readError}=await sb.from('streams').select('id').eq('stream_url',s.url).limit(1);
-    if(readError)throw readError;
-    if(existing?.length){alert('Este enlace ya está guardado en tus transmisiones.');return;}
-    const {error}=await sb.from('streams').insert(payload);
-    if(error)throw error;
-    button.textContent='Importado';await loadStreams();
-  }catch(e){alert('No se pudo importar: '+String(e?.message||e));}
-  finally{if(button.textContent!=='Importado'){button.disabled=false;button.textContent='Importar';}}
-}
-
 let streamCache=[];
 async function loadStreams(){
   const {data,error}=await sb.from('streams').select('*').order('created_at',{ascending:false});
@@ -901,46 +817,6 @@ async function loadStreams(){
 function safeUrlSummary(raw){
   try{const u=new URL(raw);return u.origin+u.pathname+(u.search?' · parámetros ocultos':'');}
   catch{return 'Dirección no válida';}
-}
-// Muestra solamente metadatos visibles de caducidad. No modifica ni renueva firmas.
-function unixToMilliseconds(raw){
-  if(!/^\d{10}(?:\d{3})?$/.test(String(raw||'')))return null;
-  const number=Number(raw);
-  const ms=String(raw).length===13?number:number*1000;
-  const date=new Date(ms);
-  if(!Number.isFinite(ms)||date.getUTCFullYear()<2020||date.getUTCFullYear()>2100)return null;
-  return ms;
-}
-function getExpiryInfo(raw){
-  let url;
-  try{url=new URL(raw);}catch{return null;}
-  const params=['expires','expire','expiry','expiration','exp','valid_until','validto','valid_to','expires_at','expiry_time','end_time','e'];
-  for(const name of params){
-    const match=[...url.searchParams.entries()].find(([k])=>k.toLowerCase()===name);
-    if(!match)continue;
-    const ms=unixToMilliseconds(match[1]);
-    if(ms!==null)return {ms,certainty:'declared',field:match[0]};
-  }
-  // Algunos enlaces contienen dos números Unix dentro de un token firmado.
-  // No está documentado cuál significa caducidad; el mayor es solo una hipótesis.
-  for(const [key,value] of url.searchParams.entries()){
-    if(!/token|signature|auth|sign|hash/i.test(key))continue;
-    const parts=value.split('-');
-    const times=parts.map(unixToMilliseconds).filter(v=>v!==null);
-    if(times.length===2)return {ms:Math.max(...times),certainty:'inferred',field:key};
-  }
-  return null;
-}
-function expiryMarkup(raw){
-  const info=getExpiryInfo(raw);
-  if(!info)return '<div class="expiry-line">Caducidad: no identificada en la URL</div>';
-  const now=Date.now();
-  const delta=info.ms-now;
-  const formatted=new Intl.DateTimeFormat('es-PA',{timeZone:'America/Panama',day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:true}).format(new Date(info.ms));
-  const cls=delta<0?'expired':delta<60*60*1000?'warning':'valid';
-  const status=delta<0?'Posiblemente vencido':delta<60*60*1000?'Vence pronto':'Fecha futura';
-  const note=info.certainty==='inferred'?'Estimación por cifras del token; el proveedor podría validarlo de otra forma.':'Fecha declarada en la URL; no garantiza acceso.';
-  return `<div class="expiry-line ${cls}">⏱ ${esc(status)} · ${esc(formatted)} (Panamá)<div class="expiry-note">${esc(note)}</div></div>`;
 }
 function renderStreams(){
   const term=($('streamSearch')?.value||'').trim().toLocaleLowerCase();
@@ -956,7 +832,6 @@ function renderStreams(){
     <div class="stream-info"><strong class="stream-title">${esc(s.match_name)}</strong>
       <div class="stream-meta"><span class="tag">${s.stream_format==='hls'?'HLS forzado':'Automático'}</span>${s.enabled?'<span class="ok">● Activo</span>':'<span class="off">● Inactivo</span>'}${s.competition?`<span class="tag">${esc(s.competition)}</span>`:''}</div>
       <div class="muted muted-url" title="URL protegida">${esc(safeUrlSummary(s.stream_url))}</div>
-      ${expiryMarkup(s.stream_url)}
     </div><div class="actions">
       <button class="secondary switch" onclick="editStream('${s.id}')">✎ Editar</button>
       <button class="switch ${s.enabled?'secondary':''}" onclick="setStream('${s.id}',${!s.enabled})">${s.enabled?'Desactivar':'Activar'}</button>
@@ -1039,8 +914,6 @@ function esc(x){
   }[m]));
 }
 
-// Actualiza automáticamente el indicador de tiempo sin modificar las URLs.
-setInterval(()=>{if(!$('panel').classList.contains('hidden'))renderStreams();},60000);
 sb.auth.onAuthStateChange(()=>init());
 init();
 </script>
