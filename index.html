@@ -64,7 +64,11 @@ button:disabled{opacity:.55;cursor:not-allowed}
 <input id="awayTeam" placeholder="Equipo visitante">
 
 <input id="competition" placeholder="Competición / Liga">
-      <input id="url" placeholder="URL de la transmisión (http/https)">
+      <input id="url" type="url" placeholder="URL completa de transmisión (http/https)">
+      <select id="streamFormat" aria-label="Formato de reproducción">
+        <option value="auto">Automático (HLS .m3u8 u otros formatos)</option>
+        <option value="hls">HLS / M3U8 forzado (incluso sin extensión)</option>
+      </select>
       <input id="referrer" placeholder="Referer (opcional)">
       <input id="userAgent" placeholder="User-Agent (opcional)">
       <input id="starts" type="datetime-local">
@@ -153,6 +157,23 @@ button:disabled{opacity:.55;cursor:not-allowed}
     <div id="streams">Cargando...</div>
   </div>
 
+  <div id="editStreamCard" class="card hidden" style="border-color:#2478a7">
+    <h2>Editar transmisión</h2>
+    <input type="hidden" id="editStreamId">
+    <div class="grid">
+      <input id="editStreamName" placeholder="Nombre de la transmisión">
+      <input id="editStreamUrl" type="url" placeholder="URL completa HTTP/HTTPS">
+      <select id="editStreamFormat" aria-label="Formato de reproducción">
+        <option value="auto">Automático</option>
+        <option value="hls">HLS / M3U8 forzado (sin extensión)</option>
+      </select>
+      <input id="editStreamReferrer" placeholder="Referer (opcional)">
+      <input id="editStreamUserAgent" placeholder="User-Agent (opcional)">
+    </div>
+    <button onclick="saveStreamEdit()">Guardar cambios</button>
+    <button class="secondary" onclick="cancelStreamEdit()">Cancelar edición</button>
+    <p id="editStreamMsg" class="muted" role="status"></p>
+  </div>
   <button class="danger" onclick="logout()">Cerrar sesión</button>
 </div>
 </main>
@@ -216,6 +237,7 @@ const payload={
     away_team:$('awayTeam').value.trim() || null,
     competition:$('competition').value.trim() || null,
     stream_url:$('url').value.trim(),
+    stream_format:$('streamFormat').value,
     referrer:$('referrer').value.trim()||null,
     user_agent:$('userAgent').value.trim()||null,
     starts_at:$('starts').value?new Date($('starts').value).toISOString():null,
@@ -269,6 +291,7 @@ async function addBulkM3U(){
           match_id: null,
           match_name: currentName,
           stream_url: line,
+          stream_format: /\.m3u8(?:[?#]|$)/i.test(line) ? 'hls' : 'auto',
           enabled: false // Requieren verificación de derechos antes de activarse
         });
         currentName = '';
@@ -760,13 +783,15 @@ async function setTodasLasTransmisiones(enabled){
 
 async function loadStreams(){
   const {data,error}=await sb.from('streams').select('*').order('created_at',{ascending:false});
-  if(error){$('streams').textContent=error.message;return}$('streams').innerHTML=data.map(s=>`
+  if(error){$('streams').textContent=error.message;return}
+  streamCache=data||[];
+  $('streams').innerHTML=streamCache.map(s=>`
     <div class="row">
       <div>
         <b>${esc(s.match_name)}</b>
         <div class="muted">
           ID ${s.match_id}<br>
-          ${esc(s.stream_url)}<br>
+          ${esc((()=>{try{const u=new URL(s.stream_url);return u.origin+u.pathname+(u.search?' · parámetros protegidos':'');}catch{return 'URL no válida';}})())}<br>
           ${s.enabled?'<span class="ok">🟢 ACTIVA</span>':'<span class="off">🔴 DESACTIVADA</span>'}
         </div>
       </div>
@@ -777,6 +802,39 @@ async function loadStreams(){
         <button class="danger switch" onclick="removeStream('${s.id}')">Eliminar</button>
       </div>
     </div>`).join('') || '<p class="muted">No hay transmisiones.</p>';
+}
+
+let streamCache=[];
+function editStream(id){
+  const s=streamCache.find(item=>String(item.id)===String(id));
+  if(!s){alert('No se encontró el canal. Actualiza la lista.');return;}
+  $('editStreamId').value=s.id;
+  $('editStreamName').value=s.match_name||'';
+  $('editStreamUrl').value=s.stream_url||'';
+  $('editStreamFormat').value=s.stream_format==='hls'?'hls':'auto';
+  $('editStreamReferrer').value=s.referrer||'';
+  $('editStreamUserAgent').value=s.user_agent||'';
+  $('editStreamMsg').textContent='';
+  $('editStreamCard').classList.remove('hidden');
+  $('editStreamCard').scrollIntoView({behavior:'smooth',block:'start'});
+}
+function cancelStreamEdit(){
+  $('editStreamCard').classList.add('hidden');
+  $('editStreamId').value='';
+}
+async function saveStreamEdit(){
+  const id=$('editStreamId').value;
+  const name=$('editStreamName').value.trim();
+  const url=$('editStreamUrl').value.trim();
+  if(!id||!name||!/^https?:\/\/[^\s]+$/i.test(url)){
+    $('editStreamMsg').textContent='Indica un nombre y una URL HTTP/HTTPS válida.';return;
+  }
+  const payload={match_name:name,stream_url:url,stream_format:$('editStreamFormat').value,
+    referrer:$('editStreamReferrer').value.trim()||null,
+    user_agent:$('editStreamUserAgent').value.trim()||null};
+  const {error}=await sb.from('streams').update(payload).eq('id',id);
+  if(error){$('editStreamMsg').textContent='No se pudo guardar: '+error.message;return;}
+  cancelStreamEdit();await loadStreams();
 }
 
 async function setStream(id,enabled){
