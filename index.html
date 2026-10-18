@@ -3,40 +3,26 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>ViveFutTIV Admin</title>
+<title>ViveFutTIV · Panel Admin</title>
 <style>
-:root{color-scheme:dark}
-*{box-sizing:border-box}
-body{margin:0;background:#07101b;color:#eaf2fb;font-family:Arial,sans-serif}
-main{max-width:1000px;margin:auto;padding:24px}
-h1{margin:0 0 6px}
-.card{background:#0d1a29;border:1px solid #1d334a;border-radius:16px;padding:18px;margin:14px 0}
-input,textarea,button,select{width:100%;padding:12px;border-radius:10px;border:1px solid #2a4560;background:#091522;color:#fff}
-textarea{resize:vertical;font-family:monospace;font-size:12px}
-button{cursor:pointer;background:#1677ff;border:0;font-weight:700;margin-top:8px}
-button:disabled{opacity:.55;cursor:not-allowed}
-.danger{background:#a93232}
-.secondary{background:#263b52}
-.muted{color:#9fb0c1;font-size:13px}
-.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
-.row{display:flex;justify-content:space-between;gap:16px;align-items:center;border-top:1px solid #1d334a;padding:14px 0}
-.row:first-child{border-top:0}
-.actions{min-width:150px}
-.switch{width:auto;padding:10px 12px;margin:3px 0}
-.hidden{display:none}
-.ok{color:#55d98b}
-.off{color:#ff9b9b}
-.badge{display:inline-block;padding:4px 8px;border-radius:999px;background:#172b3e;font-size:12px}
-.notice{padding:10px 12px;border-radius:10px;background:#102235;border:1px solid #1d3a55;margin-top:10px}
-@media(max-width:700px){
- main{padding:14px}.grid{grid-template-columns:1fr}.row{display:block}.actions{min-width:0;margin-top:10px}.switch{width:100%}
-}
+
+:root{color-scheme:dark;--bg:#090e17;--panel:#111926;--edge:#273448;--text:#f1f5fb;--muted:#a0adbe;--accent:#4b96f6}
+*{box-sizing:border-box} html{scroll-behavior:smooth}body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 system-ui,-apple-system,Segoe UI,Arial,sans-serif}
+main{max-width:1120px;margin:auto;padding:24px 18px 70px}h1{margin:0;font-size:25px;letter-spacing:-.7px}h2{font-size:19px;letter-spacing:-.3px;margin:0 0 12px}h3{margin:12px 0 8px;font-size:16px}p{margin:8px 0 12px}
+.card{background:var(--panel);border:1px solid var(--edge);border-radius:18px;padding:21px;margin:18px 0;box-shadow:0 6px 24px #0002}
+input,textarea,button,select{width:100%;padding:11px 13px;border-radius:11px;border:1px solid #34445a;background:#0c1420;color:var(--text);font:inherit;min-width:0}
+input:focus,textarea:focus,select:focus{outline:2px solid #438ef4;outline-offset:1px}textarea{resize:vertical;font:13px/1.5 ui-monospace,monospace}
+button{cursor:pointer;background:#347ddd;border-color:transparent;font-weight:650;margin-top:8px;transition:opacity .15s,transform .1s}button:hover{opacity:.88}button:active{transform:translateY(1px)}button:disabled{opacity:.55;cursor:not-allowed}
+button.secondary,.secondary{background:#253246}button.danger,.danger{background:#8e3942}.muted{color:var(--muted);font-size:13px}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px}.hidden{display:none!important}.ok{color:#55d49c}.off{color:#fa959c}.badge{display:inline-flex;padding:4px 10px;border-radius:99px;background:#23344b;font-size:12px;font-weight:650}
+.notice{padding:13px;border-radius:11px;background:#152337;border:1px solid #29425c;margin:12px 0}.row{display:flex;justify-content:space-between;gap:16px;align-items:center;border-top:1px solid #253144;padding:14px 0}.row:first-child{border-top:0}.actions{display:flex;flex-wrap:wrap;gap:7px;min-width:210px;justify-content:flex-end}.switch{width:auto;padding:8px 12px;margin:0;font-size:13px}
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:15px;margin-bottom:16px}.brand-icon{width:38px;height:38px;display:inline-grid;place-items:center;background:linear-gradient(150deg,#2978d8,#6e63c4);border-radius:13px;font-weight:850}.brand{display:flex;align-items:center;gap:12px}.toolbar{display:flex;gap:8px;flex-wrap:wrap}.toolbar a{display:inline-flex;text-decoration:none;align-items:center;padding:9px 13px;color:#d8e7fd;background:#162439;border:1px solid #2b405a;border-radius:10px;font-size:13px}.toolbar a:hover{background:#223852}.eyebrow{font-size:11px;font-weight:750;letter-spacing:1.4px;text-transform:uppercase;color:#7f9dc5}.section-head{display:flex;justify-content:space-between;align-items:center;gap:12px}.compact-status{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}.compact-status button{width:auto;padding:9px 14px;margin:0}.compact-status p{margin:0}.muted-url{word-break:break-word;overflow-wrap:anywhere;max-width:620px}.stream-info{min-width:0;flex:1}.stream-title{font-size:15px}.stream-meta{margin-top:5px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}.tag{background:#19283b;border:1px solid #2b3e55;border-radius:7px;padding:2px 7px;font-size:11px;color:#adc5e2}.stream-list-header{display:flex;gap:10px;flex-wrap:wrap;margin:16px 0}.stream-list-header input{flex:2;min-width:180px}.stream-list-header select{flex:1;min-width:145px}.summary-line{margin:0 0 10px}.more{margin:14px 0}.more summary{list-style:none;cursor:pointer;padding:12px 14px;border-radius:11px;background:#192638;border:1px solid #2e4058;font-weight:650}.more summary::after{content:'⌄';float:right;color:#9aa9bd}.more[open] summary::after{content:'⌃'}.more>div{padding:12px 2px 2px}.editing{border-color:#4d87ce;box-shadow:0 0 0 1px #4d87ce50}.edit-label{display:block;margin:8px 0 5px;font-size:12px;color:#b7c9dc}.edit-actions{display:flex;gap:8px}.edit-actions button{flex:1}.btn-danger-outline{background:transparent!important;border:1px solid #84545a!important;color:#ffb2b7}
+@media(max-width:720px){main{padding:15px 12px 60px}.grid{grid-template-columns:1fr}.card{padding:16px;margin:13px 0}.row{display:block}.actions{margin-top:12px;justify-content:flex-start;min-width:0}.actions button{flex:1}.topbar{display:block}.toolbar{margin-top:14px}.stream-list-header{display:block}.stream-list-header select{margin-top:8px}}
 </style>
 </head>
 <body>
 <main>
-<h1>ViveFutTIV Admin</h1>
-<p class="muted">Panel remoto de administración · funciona desde PC, teléfono o tablet.</p>
+<header class="topbar"><div class="brand"><span class="brand-icon">V</span><div><h1>ViveFutTIV <span style="font-weight:350">Admin</span></h1><div class="muted">Control de transmisiones</div></div></div><nav class="toolbar" aria-label="Secciones"><a href="#misCanales">Canales</a><a href="#nuevoCanal">+ Agregar</a><a href="#herramientas">Herramientas</a></nav></header>
 
 <div id="login" class="card">
   <h2>Acceso privado</h2>
@@ -48,14 +34,14 @@ button:disabled{opacity:.55;cursor:not-allowed}
 </div>
 
 <div id="panel" class="hidden">
-  <div class="card">
-    <h2>Streaming global</h2>
+  <div class="card compact-status">
+    <h2 style="margin:0">Streaming global</h2>
     <p id="globalState">Cargando...</p>
     <button onclick="toggleGlobal()">Cambiar estado</button>
   </div>
 
-  <div class="card">
-    <h2>Agregar transmisión autorizada</h2>
+  <div class="card" id="nuevoCanal">
+    <div class="section-head"><h2>Agregar transmisión</h2><span class="tag">Nuevo canal</span></div>
     <div class="grid">
      <input id="matchId" type="number" placeholder="ID de API (opcional)">
 <input id="matchName" placeholder="Nombre del partido o transmisión">
@@ -79,8 +65,9 @@ button:disabled{opacity:.55;cursor:not-allowed}
     <div class="notice muted">Usa únicamente transmisiones sobre las que tengas autorización.</div>
   </div>
 
-  <!-- Módulo de Carga Automática M3U -->
-  <div class="card">
+  <div id="herramientas" class="card"><h2>Herramientas</h2><p class="muted">Opciones avanzadas, disponibles cuando las necesites.</p>
+  <details class="more"><summary>Importar lista M3U</summary><div>
+  <div>
     <h2>⚡ Cargar Canales M3U en Lote</h2>
     <p class="muted">Pega tu lista #EXTM3U completa en el recuadro para agregar todos los canales de golpe.</p>
     <textarea id="m3uInput" rows="6" placeholder="Pega aquí tu lista M3U completa..."></textarea>
@@ -89,7 +76,9 @@ button:disabled{opacity:.55;cursor:not-allowed}
   </div>
 
 
-  <div class="card" id="programacionIA">
+  </div></details>
+  <details class="more"><summary>Programación IA y guía deportiva</summary><div>
+  <div id="programacionIA">
     <h2>🤖 Programación IA · ViveFutTIV 0.9</h2>
     <p class="muted">Pega una programación en JSON para analizar coincidencias con los canales de Admin. La importación NO publica transmisiones automáticamente: requiere comprobar programación y derechos del evento.</p>
     <div class="grid">
@@ -129,8 +118,11 @@ button:disabled{opacity:.55;cursor:not-allowed}
     <div id="iaResultados" aria-live="polite"></div>
   </div>
 
-  <div class="card">
-    <h2>Transmisiones</h2>
+  </div></details></div>
+  <div class="card" id="misCanales">
+    <div class="section-head"><h2>Mis transmisiones</h2><span id="streamCount" class="badge">—</span></div>
+    <div class="stream-list-header"><input id="streamSearch" type="search" placeholder="Buscar por canal, liga o equipo..." aria-label="Buscar canales" oninput="renderStreams()"><select id="streamFilter" aria-label="Filtrar transmisiones" onchange="renderStreams()"><option value="all">Todos los canales</option><option value="active">Solo activos</option><option value="inactive">Solo desactivados</option></select></div>
+    <details class="more"><summary>Acciones masivas</summary><div>
     <div class="notice" style="border-color:#236f55">
       <strong>Control masivo de transmisiones</strong>
       <p class="muted">Activa o desactiva todos los canales guardados en Admin. Este control es independiente del interruptor Streaming global. Activa únicamente señales para las que tengas autorización.</p>
@@ -154,10 +146,11 @@ button:disabled{opacity:.55;cursor:not-allowed}
         <p id="deleteAllMsg" class="muted" role="status" aria-live="polite"></p>
       </div>
     </div>
-    <div id="streams">Cargando...</div>
+    </div></details><p class="muted summary-line" id="visibleCount"></p>
+    <div id="streams" aria-live="polite">Cargando...</div>
   </div>
 
-  <div id="editStreamCard" class="card hidden" style="border-color:#2478a7">
+  <div id="editStreamCard" class="card hidden editing">
     <h2>Editar transmisión</h2>
     <input type="hidden" id="editStreamId">
     <div class="grid">
@@ -169,9 +162,14 @@ button:disabled{opacity:.55;cursor:not-allowed}
       </select>
       <input id="editStreamReferrer" placeholder="Referer (opcional)">
       <input id="editStreamUserAgent" placeholder="User-Agent (opcional)">
+      <input id="editStreamMatchId" type="number" placeholder="ID de API (opcional)">
+      <input id="editStreamCompetition" placeholder="Competición / Liga">
+      <input id="editStreamHome" placeholder="Equipo local">
+      <input id="editStreamAway" placeholder="Equipo visitante">
+      <label><span class="edit-label">Inicio (opcional)</span><input id="editStreamStarts" type="datetime-local"></label>
+      <label><span class="edit-label">Fin (opcional)</span><input id="editStreamEnds" type="datetime-local"></label>
     </div>
-    <button onclick="saveStreamEdit()">Guardar cambios</button>
-    <button class="secondary" onclick="cancelStreamEdit()">Cancelar edición</button>
+    <div class="edit-actions"><button id="saveEditBtn" onclick="saveStreamEdit()">Guardar cambios</button><button class="secondary" onclick="cancelStreamEdit()">Cancelar</button></div>
     <p id="editStreamMsg" class="muted" role="status"></p>
   </div>
   <button class="danger" onclick="logout()">Cerrar sesión</button>
@@ -781,30 +779,43 @@ async function setTodasLasTransmisiones(enabled){
   }
 }
 
+let streamCache=[];
 async function loadStreams(){
   const {data,error}=await sb.from('streams').select('*').order('created_at',{ascending:false});
-  if(error){$('streams').textContent=error.message;return}
+  if(error){$('streams').textContent='No se pudo cargar la lista: '+error.message;return;}
   streamCache=data||[];
-  $('streams').innerHTML=streamCache.map(s=>`
-    <div class="row">
-      <div>
-        <b>${esc(s.match_name)}</b>
-        <div class="muted">
-          ID ${s.match_id}<br>
-          ${esc((()=>{try{const u=new URL(s.stream_url);return u.origin+u.pathname+(u.search?' · parámetros protegidos':'');}catch{return 'URL no válida';}})())}<br>
-          ${s.enabled?'<span class="ok">🟢 ACTIVA</span>':'<span class="off">🔴 DESACTIVADA</span>'}
-        </div>
-      </div>
-      <div class="actions">
-        <button class="secondary switch" onclick="setStream('${s.id}',${!s.enabled})">
-          ${s.enabled?'Desactivar':'Activar'}
-        </button>
-        <button class="danger switch" onclick="removeStream('${s.id}')">Eliminar</button>
-      </div>
-    </div>`).join('') || '<p class="muted">No hay transmisiones.</p>';
+  renderStreams();
 }
-
-let streamCache=[];
+function safeUrlSummary(raw){
+  try{const u=new URL(raw);return u.origin+u.pathname+(u.search?' · parámetros ocultos':'');}
+  catch{return 'Dirección no válida';}
+}
+function renderStreams(){
+  const term=($('streamSearch')?.value||'').trim().toLocaleLowerCase();
+  const filter=$('streamFilter')?.value||'all';
+  const filtered=streamCache.filter(s=>{
+    const matches=[s.match_name,s.competition,s.home_team,s.away_team].some(v=>String(v||'').toLocaleLowerCase().includes(term));
+    return matches&&(filter==='all'||(filter==='active'&&s.enabled)||(filter==='inactive'&&!s.enabled));
+  });
+  const active=streamCache.filter(s=>s.enabled).length;
+  $('streamCount').textContent=streamCache.length+' canales';
+  $('visibleCount').textContent=filtered.length+' resultados · '+active+' activos · '+(streamCache.length-active)+' desactivados';
+  $('streams').innerHTML=filtered.map(s=>`<div class="row">
+    <div class="stream-info"><strong class="stream-title">${esc(s.match_name)}</strong>
+      <div class="stream-meta"><span class="tag">${s.stream_format==='hls'?'HLS forzado':'Automático'}</span>${s.enabled?'<span class="ok">● Activo</span>':'<span class="off">● Inactivo</span>'}${s.competition?`<span class="tag">${esc(s.competition)}</span>`:''}</div>
+      <div class="muted muted-url" title="URL protegida">${esc(safeUrlSummary(s.stream_url))}</div>
+    </div><div class="actions">
+      <button class="secondary switch" onclick="editStream('${s.id}')">✎ Editar</button>
+      <button class="switch ${s.enabled?'secondary':''}" onclick="setStream('${s.id}',${!s.enabled})">${s.enabled?'Desactivar':'Activar'}</button>
+      <button class="switch btn-danger-outline" onclick="removeStream('${s.id}')">Eliminar</button>
+    </div></div>`).join('')||'<p class="muted">No hay transmisiones con estos filtros.</p>';
+}
+function toLocalDateTime(iso){
+  if(!iso)return '';
+  const date=new Date(iso);if(Number.isNaN(date.getTime()))return '';
+  const local=new Date(date.getTime()-date.getTimezoneOffset()*60000);
+  return local.toISOString().slice(0,16);
+}
 function editStream(id){
   const s=streamCache.find(item=>String(item.id)===String(id));
   if(!s){alert('No se encontró el canal. Actualiza la lista.');return;}
@@ -814,27 +825,43 @@ function editStream(id){
   $('editStreamFormat').value=s.stream_format==='hls'?'hls':'auto';
   $('editStreamReferrer').value=s.referrer||'';
   $('editStreamUserAgent').value=s.user_agent||'';
-  $('editStreamMsg').textContent='';
+  $('editStreamMatchId').value=s.match_id??'';
+  $('editStreamCompetition').value=s.competition||'';
+  $('editStreamHome').value=s.home_team||'';
+  $('editStreamAway').value=s.away_team||'';
+  $('editStreamStarts').value=toLocalDateTime(s.starts_at);
+  $('editStreamEnds').value=toLocalDateTime(s.ends_at);
+  $('editStreamMsg').textContent='Puedes modificar los datos sin eliminar el canal ni cambiar su estado.';
   $('editStreamCard').classList.remove('hidden');
   $('editStreamCard').scrollIntoView({behavior:'smooth',block:'start'});
 }
 function cancelStreamEdit(){
-  $('editStreamCard').classList.add('hidden');
-  $('editStreamId').value='';
+  $('editStreamCard').classList.add('hidden');$('editStreamId').value='';
 }
 async function saveStreamEdit(){
   const id=$('editStreamId').value;
   const name=$('editStreamName').value.trim();
   const url=$('editStreamUrl').value.trim();
-  if(!id||!name||!/^https?:\/\/[^\s]+$/i.test(url)){
-    $('editStreamMsg').textContent='Indica un nombre y una URL HTTP/HTTPS válida.';return;
-  }
-  const payload={match_name:name,stream_url:url,stream_format:$('editStreamFormat').value,
-    referrer:$('editStreamReferrer').value.trim()||null,
-    user_agent:$('editStreamUserAgent').value.trim()||null};
-  const {error}=await sb.from('streams').update(payload).eq('id',id);
-  if(error){$('editStreamMsg').textContent='No se pudo guardar: '+error.message;return;}
-  cancelStreamEdit();await loadStreams();
+  let validUrl=false;
+  try{validUrl=['http:','https:'].includes(new URL(url).protocol);}catch{}
+  if(!id||!name||!validUrl){$('editStreamMsg').textContent='Indica nombre y URL HTTP/HTTPS válida.';return;}
+  const payload={
+    match_name:name,stream_url:url,stream_format:$('editStreamFormat').value,
+    referrer:$('editStreamReferrer').value.trim()||null,user_agent:$('editStreamUserAgent').value.trim()||null,
+    match_id:$('editStreamMatchId').value?Number($('editStreamMatchId').value):null,
+    competition:$('editStreamCompetition').value.trim()||null,
+    home_team:$('editStreamHome').value.trim()||null,away_team:$('editStreamAway').value.trim()||null,
+    starts_at:$('editStreamStarts').value?new Date($('editStreamStarts').value).toISOString():null,
+    ends_at:$('editStreamEnds').value?new Date($('editStreamEnds').value).toISOString():null
+  };
+  const btn=$('saveEditBtn');btn.disabled=true;$('editStreamMsg').textContent='Guardando cambios...';
+  try{
+    const {data,error}=await sb.from('streams').update(payload).eq('id',id).select('id');
+    if(error)throw error;
+    if(!data?.length)throw new Error('Supabase no confirmó la actualización. Revisa los permisos de edición.');
+    cancelStreamEdit();await loadStreams();
+  }catch(e){$('editStreamMsg').textContent='No se pudo guardar: '+e.message;}
+  finally{btn.disabled=false;}
 }
 
 async function setStream(id,enabled){
