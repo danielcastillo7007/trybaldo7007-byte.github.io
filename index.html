@@ -36,11 +36,12 @@ button.secondary,.secondary{background:#253246}button.danger,.danger{background:
 
 <div id="panel" class="hidden">
   <div class="card" id="noticiasDeportivas">
-    <h2>📰 Noticias deportivas · Enlaces</h2>
-    <p class="muted">Agrega enlaces a noticias o vídeos propios/autorizados. En la app aparecerán con el botón «VER» y se abrirán dentro del visor web.</p>
+    <h2>🔗 Noticias, vídeos y páginas web · Enlaces</h2>
+    <p class="muted">Agrega páginas web, artículos y vídeos propios o autorizados (HLS M3U8, MPEG-DASH MPD y MP4). En la app, «VER» abrirá el visor interno o el reproductor de vídeo según el tipo de enlace. Las listas M3U completas se administran por separado.</p>
     <div class="grid">
       <label>Nombre<input id="sportsNewsTitle" maxlength="180" placeholder="Noticia deportiva"></label>
-      <label>URL HTTPS<input id="sportsNewsUrl" type="url" placeholder="https://www.marca.com/..."></label>
+      <label>URL HTTPS<input id="sportsNewsUrl" type="url" placeholder="https://servidor.com/video.m3u8 o https://sitio.com/"></label>
+      <label>Tipo de enlace<select id="sportsNewsType"><option value="auto">Automático según URL</option><option value="web">Página web / artículo</option><option value="hls">Vídeo HLS (.m3u8)</option><option value="dash">Vídeo DASH (.mpd)</option><option value="mp4">Vídeo MP4</option></select></label>
       <label>Orden<input id="sportsNewsOrder" type="number" min="0" value="100"></label>
       <label>Estado<select id="sportsNewsEnabled"><option value="true">Visible</option><option value="false">Oculto</option></select></label>
     </div>
@@ -250,17 +251,17 @@ async function init(){
 let sportsNewsCache=[];
 const validSportsNewsUrl=(u)=>{try{const p=new URL(u);return p.protocol==='https:'&&!!p.hostname&&!p.username&&!p.password;}catch{return false;}};
 async function loadSportsNews(){
- const {data,error}=await sb.from('sports_news').select('id,title,url,enabled,sort_order').order('sort_order',{ascending:true});
- if(error){$('sportsNewsMsg').textContent='No se pudieron cargar las noticias. Instala primero el SQL: '+error.message;return;}
+ const {data,error}=await sb.from('sports_news').select('id,title,url,link_type,enabled,sort_order').order('sort_order',{ascending:true});
+ if(error){$('sportsNewsMsg').textContent='No se pudieron cargar los enlaces. Ejecuta SQL_ENLACES_UNIVERSALES.sql: '+error.message;return;}
  sportsNewsCache=data||[];
- $('sportsNewsList').innerHTML=sportsNewsCache.map(a=>`<div class="card"><b>${esc(a.title)}</b><p class="muted">${esc(a.url)} · ${a.enabled?'Visible':'Oculto'}</p><button class="secondary" onclick="editSportsNews('${a.id}')">Editar</button><button class="danger" onclick="deleteSportsNews('${a.id}')">Eliminar</button></div>`).join('')||'<p class="muted">Todavía no hay enlaces.</p>';
+ $('sportsNewsList').innerHTML=sportsNewsCache.map(a=>`<div class="card"><b>${esc(a.title)}</b><p class="muted">${esc(a.url)} · ${esc(a.link_type||'auto')} · ${a.enabled?'Visible':'Oculto'}</p><button class="secondary" onclick="editSportsNews('${a.id}')">Editar</button><button class="danger" onclick="deleteSportsNews('${a.id}')">Eliminar</button></div>`).join('')||'<p class="muted">Todavía no hay enlaces.</p>';
 }
-function resetSportsNewsForm(){ $('sportsNewsEditId').value='';$('sportsNewsTitle').value='';$('sportsNewsUrl').value='';$('sportsNewsOrder').value='100';$('sportsNewsEnabled').value='true'; }
-function editSportsNews(id){ const item=sportsNewsCache.find(a=>a.id===id);if(!item)return;$('sportsNewsEditId').value=id;$('sportsNewsTitle').value=item.title;$('sportsNewsUrl').value=item.url;$('sportsNewsOrder').value=item.sort_order;$('sportsNewsEnabled').value=String(item.enabled);$('noticiasDeportivas').scrollIntoView({behavior:'smooth'}); }
+function resetSportsNewsForm(){ $('sportsNewsEditId').value='';$('sportsNewsTitle').value='';$('sportsNewsUrl').value='';$('sportsNewsOrder').value='100';$('sportsNewsType').value='auto';$('sportsNewsEnabled').value='true'; }
+function editSportsNews(id){ const item=sportsNewsCache.find(a=>a.id===id);if(!item)return;$('sportsNewsEditId').value=id;$('sportsNewsTitle').value=item.title;$('sportsNewsUrl').value=item.url;$('sportsNewsOrder').value=item.sort_order;$('sportsNewsType').value=item.link_type||'auto';$('sportsNewsEnabled').value=String(item.enabled);$('noticiasDeportivas').scrollIntoView({behavior:'smooth'}); }
 async function saveSportsNews(){
  const title=$('sportsNewsTitle').value.trim(),url=$('sportsNewsUrl').value.trim(),id=$('sportsNewsEditId').value;
  if(!title||!validSportsNewsUrl(url)){$('sportsNewsMsg').textContent='Introduce un nombre y una dirección HTTPS válida.';return;}
- const row={title,url,enabled:$('sportsNewsEnabled').value==='true',sort_order:Number($('sportsNewsOrder').value)||0};
+ const row={title,url,link_type:$('sportsNewsType').value,enabled:$('sportsNewsEnabled').value==='true',sort_order:Number($('sportsNewsOrder').value)||0};
  const q=id?sb.from('sports_news').update(row).eq('id',id):sb.from('sports_news').insert(row);
  const {error}=await q;
  $('sportsNewsMsg').textContent=error?error.message:'Enlace guardado correctamente';
